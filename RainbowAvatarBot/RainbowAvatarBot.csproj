@@ -2,13 +2,13 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>netcoreapp2.2</TargetFramework>
+		<TargetFramework>netcoreapp3.0</TargetFramework>
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0006" />
-	  <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0006" />
-	  <PackageReference Include="Telegram.Bot" Version="14.11.0" />
+	  <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0007" />
+	  <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0007" />
+	  <PackageReference Include="Telegram.Bot" Version="15.0.0" />
 	</ItemGroup>
 
 </Project>

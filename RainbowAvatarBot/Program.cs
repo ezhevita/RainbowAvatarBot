@@ -151,13 +151,13 @@ namespace RainbowAvatarBot {
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
 					Image<Rgba32> pictureImage;
-					using (MemoryStream stream = new MemoryStream()) {
+					await using (MemoryStream stream = new MemoryStream()) {
 						await BotClient.GetInfoAndDownloadFileAsync(picture.FileId, stream).ConfigureAwait(false);
-						pictureImage = Image.Load(stream, new JpegDecoder());
+						pictureImage = Image.Load<Rgba32>(stream, new JpegDecoder());
 					}
 
 					pictureImage.Overlay(Images[imageName]);
-					using (MemoryStream stream = new MemoryStream()) {
+					await using (MemoryStream stream = new MemoryStream()) {
 						pictureImage.Save(stream, new PngEncoder());
 						stream.Position = 0;
 						await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
@@ -208,16 +208,16 @@ namespace RainbowAvatarBot {
 
 								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
 								Image<Rgba32> avatarImage;
-								using (MemoryStream stream = new MemoryStream()) {
+								await using (MemoryStream stream = new MemoryStream()) {
 									await BotClient.GetInfoAndDownloadFileAsync(avatar.FileId, stream).ConfigureAwait(false);
-									avatarImage = Image.Load(stream, new JpegDecoder());
+									avatarImage = Image.Load<Rgba32>(stream, new JpegDecoder());
 								}
 
 								avatarImage.Overlay(Images[imageName]);
-								using (MemoryStream stream = new MemoryStream()) {
+								await using (MemoryStream stream = new MemoryStream()) {
 									avatarImage.Save(stream, new PngEncoder());
 									stream.Position = 0;
-									await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+									await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId).ConfigureAwait(false);
 								}
 
 								avatarImage.Dispose();
