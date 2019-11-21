@@ -6,11 +6,17 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
+		DebugDrawing|Any CPU = DebugDrawing|Any CPU
+		ReleaseDrawing|Any CPU = ReleaseDrawing|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.ActiveCfg = DebugDrawing|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.Build.0 = DebugDrawing|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.ActiveCfg = ReleaseDrawing|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.Build.0 = ReleaseDrawing|Any CPU
 	EndGlobalSection
 EndGlobal

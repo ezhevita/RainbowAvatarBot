@@ -1,4 +1,17 @@
-﻿using System;
+﻿#if SYSTEMDRAWING
+using System.Drawing;
+using System.Drawing.Imaging;
+#else
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image;
+using RectangleF = SixLabors.Primitives.RectangleF;
+#endif
+
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -6,12 +19,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.Primitives;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -23,7 +30,12 @@ namespace RainbowAvatarBot {
 	internal static class Program {
 		private const int AdminID = 204723509;
 
+	#if SYSTEMDRAWING
+		private static readonly Dictionary<string, Image> Images = new Dictionary<string, Image>();
+	#else
 		private static readonly Dictionary<string, Image<Rgba32>> Images = new Dictionary<string, Image<Rgba32>>();
+	#endif
+
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserMessages = new ConcurrentDictionary<int, DateTime>();
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
@@ -48,7 +60,7 @@ namespace RainbowAvatarBot {
 				Directory.CreateDirectory("images");
 			}
 
-			Dictionary<string, List<uint>> flags = JsonConvert.DeserializeObject<Dictionary<string, List<uint>>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
+			Dictionary<string, uint[]> flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
 			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
 			if (flags.Keys.Any(name => !existFiles.Contains(name))) {
 				GenerateImages(flags);
@@ -64,7 +76,7 @@ namespace RainbowAvatarBot {
 			Timer clearTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 			await ShutdownSemaphore.WaitAsync().ConfigureAwait(false);
 			clearTimer.Dispose();
-			foreach ((_, Image<Rgba32> image) in Images) {
+			foreach ((_, Image image) in Images) {
 				image.Dispose();
 			}
 
@@ -150,15 +162,28 @@ namespace RainbowAvatarBot {
 
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
+				#if SYSTEMDRAWING
+					Image pictureImage;
+				#else
 					Image<Rgba32> pictureImage;
+				#endif
 					await using (MemoryStream stream = new MemoryStream()) {
 						await BotClient.GetInfoAndDownloadFileAsync(picture.FileId, stream).ConfigureAwait(false);
+					#if SYSTEMDRAWING
+						pictureImage = Image.FromStream(stream);
+					#else
+						stream.Position = 0;
 						pictureImage = Image.Load<Rgba32>(stream, new JpegDecoder());
+					#endif
 					}
 
 					pictureImage.Overlay(Images[imageName]);
 					await using (MemoryStream stream = new MemoryStream()) {
+					#if SYSTEMDRAWING
+						pictureImage.Save(stream, ImageFormat.Png);
+					#else
 						pictureImage.Save(stream, new PngEncoder());
+					#endif
 						stream.Position = 0;
 						await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 					}
@@ -207,15 +232,28 @@ namespace RainbowAvatarBot {
 								}
 
 								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
+							#if SYSTEMDRAWING
+								Image avatarImage;
+							#else
 								Image<Rgba32> avatarImage;
+							#endif
 								await using (MemoryStream stream = new MemoryStream()) {
 									await BotClient.GetInfoAndDownloadFileAsync(avatar.FileId, stream).ConfigureAwait(false);
+								#if SYSTEMDRAWING
+									avatarImage = Image.FromStream(stream);
+								#else
+									stream.Position = 0;
 									avatarImage = Image.Load<Rgba32>(stream, new JpegDecoder());
+								#endif
 								}
 
 								avatarImage.Overlay(Images[imageName]);
 								await using (MemoryStream stream = new MemoryStream()) {
+								#if SYSTEMDRAWING
+									avatarImage.Save(stream, ImageFormat.Png);
+								#else
 									avatarImage.Save(stream, new PngEncoder());
+								#endif
 									stream.Position = 0;
 									await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId).ConfigureAwait(false);
 								}
@@ -286,28 +324,46 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static void GenerateImages(Dictionary<string, List<uint>> flags) {
+		private static void GenerateImages(Dictionary<string, uint[]> flags) {
 			const int flagSize = 1024;
-			foreach ((string name, List<uint> rgbValues) in flags) {
-				Image<Rgba32> image = new Image<Rgba32>(flagSize, flagSize);
-				for (int i = 0; i < rgbValues.Count; i++) {
-					int index = i;
-					uint rgbValue = rgbValues.ElementAt(index);
-					byte r = (byte) (rgbValue / (256 * 256));
-					byte g = (byte) (rgbValue / 256 % 256);
-					byte b = (byte) (rgbValue % 256);
-					image.Mutate(img => img.Fill(new Rgba32(r, g, b), new RectangleF(0, (int) Math.Round((float) flagSize / rgbValues.Count * index), flagSize, (int) Math.Round((float) flagSize / rgbValues.Count * (index + 1)))));
+			foreach ((string name, uint[] rgbValues) in flags) {
+			#if SYSTEMDRAWING
+				using Bitmap image = new Bitmap(flagSize, flagSize);
+				using Graphics graphics = Graphics.FromImage(image);
+
+				byte index = 0;
+				foreach (uint rgbValue in rgbValues) {
+					using SolidBrush brush = new SolidBrush(Color.FromArgb((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)));
+					graphics.FillRectangle(brush, new RectangleF(0, (int) Math.Round((float) flagSize / rgbValues.Length * index), flagSize, (int) Math.Round((float) flagSize / rgbValues.Length * (index + 1))));
+					index++;
+				}
+
+				image.Save(Path.Join("images", $"{name}.png"), ImageFormat.Png);
+			#else
+				using Image<Rgba32> image = new Image<Rgba32>(flagSize, flagSize);
+				byte index = 0;
+				foreach (uint rgbValue in rgbValues) {
+					byte r = (byte) (rgbValue >> 16);
+					byte g = (byte) ((rgbValue >> 8) & 0xFF);
+					byte b = (byte) (rgbValue & 0xFF);
+					byte i = index;
+					image.Mutate(img => img.Fill(new Rgba32(r, g, b), new RectangleF(0, (int) Math.Round((float) flagSize / rgbValues.Length * i), flagSize, (int) Math.Round((float) flagSize / rgbValues.Length * (i + 1)))));
+					index++;
 				}
 
 				image.Save(Path.Join("images", $"{name}.png"), new PngEncoder());
-				image.Dispose();
+			#endif
 			}
 		}
 
 		private static void LoadImages() {
 			foreach (string file in Directory.EnumerateFiles("images")) {
 				string name = Path.GetFileNameWithoutExtension(file);
+			#if SYSTEMDRAWING
+				Images.Add(name, Image.FromFile(file));
+			#else
 				Images.Add(name, Image.Load<Rgba32>(Configuration.Default, file));
+			#endif
 			}
 		}
 
