@@ -72,7 +72,9 @@ namespace RainbowAvatarBot {
 			overlayBitmap.UnlockBits(overlayData);
 			newOverlayBitmap.UnlockBits(newOverlayData);
 
-			sourceBitmap.SetResolution(newOverlayBitmap.HorizontalResolution, newOverlayBitmap.VerticalResolution);
+			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+				sourceBitmap.SetResolution(newOverlayBitmap.HorizontalResolution, newOverlayBitmap.VerticalResolution);
+			}
 
 			using Graphics graphics = Graphics.FromImage(sourceImage);
 			graphics.DrawImage(newOverlayBitmap.SetOpacity(0.5f), 0, 0);
