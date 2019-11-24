@@ -7,7 +7,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using Image = SixLabors.ImageSharp.Image;
+using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
 using RectangleF = SixLabors.Primitives.RectangleF;
 #endif
 
@@ -29,12 +29,7 @@ using File = System.IO.File;
 namespace RainbowAvatarBot {
 	internal static class Program {
 		private const int AdminID = 204723509;
-
-	#if SYSTEMDRAWING
 		private static readonly Dictionary<string, Image> Images = new Dictionary<string, Image>();
-	#else
-		private static readonly Dictionary<string, Image<Rgba32>> Images = new Dictionary<string, Image<Rgba32>>();
-	#endif
 
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserMessages = new ConcurrentDictionary<int, DateTime>();
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
@@ -155,40 +150,19 @@ namespace RainbowAvatarBot {
 			}
 
 			switch (e.Message.Type) {
-				case MessageType.Photo when (e.Message.Chat.Type == ChatType.Private) || (args[0].ToUpperInvariant() == "PROCESS"): {
+				case MessageType.Photo when (e.Message.Chat.Type == ChatType.Private) || (args[0].ToUpperInvariant() == "COLORIZE"): {
 					if (!UserSettings.TryGetValue(senderID, out string imageName)) {
 						imageName = "LGBT";
 					}
 
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-				#if SYSTEMDRAWING
-					Image pictureImage;
-				#else
-					Image<Rgba32> pictureImage;
-				#endif
-					await using (MemoryStream stream = new MemoryStream()) {
-						await BotClient.GetInfoAndDownloadFileAsync(picture.FileId, stream).ConfigureAwait(false);
-					#if SYSTEMDRAWING
-						pictureImage = Image.FromStream(stream);
-					#else
-						stream.Position = 0;
-						pictureImage = Image.Load<Rgba32>(stream, new JpegDecoder());
-					#endif
-					}
+					using Image pictureImage = await DownloadImageByFileID(picture.FileId);
 
 					pictureImage.Overlay(Images[imageName]);
-					await using (MemoryStream stream = new MemoryStream()) {
-					#if SYSTEMDRAWING
-						pictureImage.Save(stream, ImageFormat.Png);
-					#else
-						pictureImage.Save(stream, new PngEncoder());
-					#endif
-						stream.Position = 0;
-						await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
-					}
+					await using MemoryStream stream = pictureImage.SaveToPng();
+					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 
-					pictureImage.Dispose();
 					break;
 				}
 
@@ -226,39 +200,17 @@ namespace RainbowAvatarBot {
 								} else {
 									avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1).ConfigureAwait(false);
 									if (avatars.Photos.Length == 0) {
-										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so we would be able to see it.", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 										return;
 									}
 								}
 
 								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-							#if SYSTEMDRAWING
-								Image avatarImage;
-							#else
-								Image<Rgba32> avatarImage;
-							#endif
-								await using (MemoryStream stream = new MemoryStream()) {
-									await BotClient.GetInfoAndDownloadFileAsync(avatar.FileId, stream).ConfigureAwait(false);
-								#if SYSTEMDRAWING
-									avatarImage = Image.FromStream(stream);
-								#else
-									stream.Position = 0;
-									avatarImage = Image.Load<Rgba32>(stream, new JpegDecoder());
-								#endif
-								}
+								using Image avatarImage = await DownloadImageByFileID(avatar.FileId);
+								await using MemoryStream stream = avatarImage.SaveToPng();
 
 								avatarImage.Overlay(Images[imageName]);
-								await using (MemoryStream stream = new MemoryStream()) {
-								#if SYSTEMDRAWING
-									avatarImage.Save(stream, ImageFormat.Png);
-								#else
-									avatarImage.Save(stream, new PngEncoder());
-								#endif
-									stream.Position = 0;
-									await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId).ConfigureAwait(false);
-								}
-
-								avatarImage.Dispose();
+								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId).ConfigureAwait(false);
 							} catch (Exception ex) {
 								Log(ex.ToString());
 								try {
@@ -267,6 +219,22 @@ namespace RainbowAvatarBot {
 									// ignored
 								}
 							}
+
+							break;
+						}
+
+						case "COLORIZE" when e.Message.ReplyToMessage?.Type == MessageType.Photo: {
+							if (!UserSettings.TryGetValue(senderID, out string imageName)) {
+								imageName = "LGBT";
+							}
+
+							PhotoSize picture = e.Message.ReplyToMessage.Photo.OrderByDescending(photo => photo.Height).First();
+							Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
+							using Image pictureImage = await DownloadImageByFileID(picture.FileId);
+
+							pictureImage.Overlay(Images[imageName]);
+							await using MemoryStream stream = pictureImage.SaveToPng();
+							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 
 							break;
 						}
@@ -297,6 +265,18 @@ namespace RainbowAvatarBot {
 					break;
 				}
 			}
+		}
+
+		private static async Task<Image> DownloadImageByFileID(string fileID) {
+			await using MemoryStream stream = new MemoryStream();
+			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream).ConfigureAwait(false);
+
+		#if SYSTEMDRAWING
+			return Image.FromStream(stream);
+		#else
+			stream.Position = 0;
+			return SixLabors.ImageSharp.Image.Load<Rgba32>(stream, new JpegDecoder());
+		#endif
 		}
 
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
@@ -362,7 +342,7 @@ namespace RainbowAvatarBot {
 			#if SYSTEMDRAWING
 				Images.Add(name, Image.FromFile(file));
 			#else
-				Images.Add(name, Image.Load<Rgba32>(Configuration.Default, file));
+				Images.Add(name, SixLabors.ImageSharp.Image.Load<Rgba32>(Configuration.Default, file));
 			#endif
 			}
 		}

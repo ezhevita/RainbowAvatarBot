@@ -8,11 +8,14 @@ using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.ColorSpaces.Conversion;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using SixLabors.Primitives;
 #endif
+
+using System.IO;
 
 namespace RainbowAvatarBot {
 	internal static class Extensions {
@@ -111,6 +114,12 @@ namespace RainbowAvatarBot {
 				sourceImage.OverlayNormal(resized);
 			}
 		}
+
+		internal static MemoryStream SaveToPng(this Image image) {
+			MemoryStream stream = new MemoryStream();
+			image.Save(stream, ImageFormat.Png);
+			return stream;
+		}
 	#else
 		private static readonly ColorSpaceConverter Converter = new ColorSpaceConverter();
 
@@ -125,6 +134,13 @@ namespace RainbowAvatarBot {
 		internal static void Overlay(this Image<Rgba32> sourceImage, Image<Rgba32> overlayImage) {
 			using Image<Rgba32> resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height));
 			sourceImage.Mutate(img => img.DrawImage(resized, Point.Empty, sourceImage.IsBrightPicture() ? PixelColorBlendingMode.HardLight : PixelColorBlendingMode.Normal, 0.5f));
+		}
+
+		internal static MemoryStream SaveToPng(this Image<Rgba32> image) {
+			MemoryStream stream = new MemoryStream();
+			image.Save(stream, new PngEncoder());
+			stream.Position = 0;
+			return stream;
 		}
 	#endif
 	}
