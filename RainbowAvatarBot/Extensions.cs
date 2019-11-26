@@ -118,6 +118,7 @@ namespace RainbowAvatarBot {
 		internal static MemoryStream SaveToPng(this Image image) {
 			MemoryStream stream = new MemoryStream();
 			image.Save(stream, ImageFormat.Png);
+			stream.Position = 0;
 			return stream;
 		}
 	#else

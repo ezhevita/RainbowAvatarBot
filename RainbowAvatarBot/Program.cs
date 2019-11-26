@@ -46,7 +46,7 @@ namespace RainbowAvatarBot {
 			Log("Starting " + nameof(RainbowAvatarBot));
 			string token = File.ReadAllText("token.txt");
 			BotClient = new TelegramBotClient(token);
-			if (!await BotClient.TestApiAsync().ConfigureAwait(false)) {
+			if (!await BotClient.TestApiAsync()) {
 				Log("Error when starting bot!");
 				return;
 			}
@@ -69,7 +69,7 @@ namespace RainbowAvatarBot {
 
 			Log("Started!");
 			Timer clearTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-			await ShutdownSemaphore.WaitAsync().ConfigureAwait(false);
+			await ShutdownSemaphore.WaitAsync();
 			clearTimer.Dispose();
 			foreach ((_, Image image) in Images) {
 				image.Dispose();
@@ -96,7 +96,7 @@ namespace RainbowAvatarBot {
 				case "SETTINGS": {
 					string name = args[1];
 					if (!Images.ContainsKey(name)) {
-						await BotClient.AnswerCallbackQueryAsync(callbackID, "Invalid name of the flag!").ConfigureAwait(false);
+						await BotClient.AnswerCallbackQueryAsync(callbackID, "Invalid name of the flag!");
 						return;
 					}
 
@@ -106,8 +106,9 @@ namespace RainbowAvatarBot {
 						UserSettings[senderID] = name;
 					}
 
-					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, "Changed to " + name + " flag", replyMarkup: InlineKeyboardMarkup.Empty()).ConfigureAwait(false);
-					await BotClient.AnswerCallbackQueryAsync(callbackID, "Success!").ConfigureAwait(false);
+					await File.WriteAllTextAsync("config.json", JsonConvert.SerializeObject(UserSettings));
+					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, "Changed to " + name + " flag", replyMarkup: InlineKeyboardMarkup.Empty());
+					await BotClient.AnswerCallbackQueryAsync(callbackID, "Success!");
 					break;
 				}
 			}
@@ -161,7 +162,7 @@ namespace RainbowAvatarBot {
 
 					pictureImage.Overlay(Images[imageName]);
 					await using MemoryStream stream = pictureImage.SaveToPng();
-					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 					break;
 				}
@@ -175,7 +176,7 @@ namespace RainbowAvatarBot {
 							                                             " LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just" +
 							                                             " send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay," +
 							                                             " enter /settings.\n" +
-							                                             " Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+							                                             " Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
@@ -192,15 +193,15 @@ namespace RainbowAvatarBot {
 
 								UserProfilePhotos avatars;
 								if (e.Message.ReplyToMessage != null) {
-									avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1).ConfigureAwait(false);
+									avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
 									if (avatars.Photos.Length == 0) {
-										await BotClient.SendTextMessageAsync(senderID, "I can't find profile pictures!", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+										await BotClient.SendTextMessageAsync(senderID, "I can't find profile pictures!", replyToMessageId: e.Message.MessageId);
 										return;
 									}
 								} else {
-									avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1).ConfigureAwait(false);
+									avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
 									if (avatars.Photos.Length == 0) {
-										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId);
 										return;
 									}
 								}
@@ -210,11 +211,11 @@ namespace RainbowAvatarBot {
 								await using MemoryStream stream = avatarImage.SaveToPng();
 
 								avatarImage.Overlay(Images[imageName]);
-								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId).ConfigureAwait(false);
+								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId);
 							} catch (Exception ex) {
 								Log(ex.ToString());
 								try {
-									await BotClient.SendTextMessageAsync(chatID, "Some unknown error occured! Please try again or contact developer.", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+									await BotClient.SendTextMessageAsync(chatID, "Some unknown error occured! Please try again or contact developer.", replyToMessageId: e.Message.MessageId);
 								} catch (Exception) {
 									// ignored
 								}
@@ -234,13 +235,13 @@ namespace RainbowAvatarBot {
 
 							pictureImage.Overlay(Images[imageName]);
 							await using MemoryStream stream = pictureImage.SaveToPng();
-							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 							break;
 						}
 
 						case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
-							await BotClient.SendTextMessageAsync(chatID, "Settings command must be sent to the private chat!", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+							await BotClient.SendTextMessageAsync(chatID, "Settings command must be sent to the private chat!", replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
@@ -248,13 +249,13 @@ namespace RainbowAvatarBot {
 							await BotClient.SendTextMessageAsync(chatID, "Select flag:", replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
 								CallbackData = "SETTINGS_" + name,
 								Text = name + " flag"
-							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
 						default: {
 							if (e.Message.Chat.Type == ChatType.Private) {
-								await BotClient.SendTextMessageAsync(chatID, "Unknown command!", replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+								await BotClient.SendTextMessageAsync(chatID, "Unknown command!", replyToMessageId: e.Message.MessageId);
 							}
 
 							break;
@@ -269,7 +270,7 @@ namespace RainbowAvatarBot {
 
 		private static async Task<Image> DownloadImageByFileID(string fileID) {
 			await using MemoryStream stream = new MemoryStream();
-			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream).ConfigureAwait(false);
+			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
 
 		#if SYSTEMDRAWING
 			return Image.FromStream(stream);
