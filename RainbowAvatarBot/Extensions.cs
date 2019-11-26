@@ -1,3 +1,5 @@
+using System.IO;
+
 #if SYSTEMDRAWING
 using System;
 using System.Drawing;
@@ -14,8 +16,6 @@ using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using SixLabors.Primitives;
 #endif
-
-using System.IO;
 
 namespace RainbowAvatarBot {
 	internal static class Extensions {

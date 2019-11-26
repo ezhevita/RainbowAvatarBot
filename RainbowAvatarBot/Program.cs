@@ -1,16 +1,4 @@
-﻿#if SYSTEMDRAWING
-using System.Drawing;
-using System.Drawing.Imaging;
-#else
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
-using RectangleF = SixLabors.Primitives.RectangleF;
-#endif
-
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -25,6 +13,18 @@ using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using File = System.IO.File;
 
+#if SYSTEMDRAWING
+using System.Drawing;
+using System.Drawing.Imaging;
+#else
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
+using RectangleF = SixLabors.Primitives.RectangleF;
+#endif
+
 namespace RainbowAvatarBot {
 	internal static class Program {
 		private const int AdminID = 204723509;
@@ -36,47 +36,6 @@ namespace RainbowAvatarBot {
 
 		private static TelegramBotClient BotClient;
 		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
-
-		private static async Task Main() {
-			if (File.Exists("config.json")) {
-				UserSettings = JsonConvert.DeserializeObject<ConcurrentDictionary<int, string>>(File.ReadAllText("config.json"));
-			}
-
-			Log("Starting " + nameof(RainbowAvatarBot));
-			string token = File.ReadAllText("token.txt");
-			BotClient = new TelegramBotClient(token);
-			if (!await BotClient.TestApiAsync()) {
-				Log("Error when starting bot!");
-				return;
-			}
-
-			if (!Directory.Exists("images")) {
-				Directory.CreateDirectory("images");
-			}
-
-			Dictionary<string, uint[]> flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
-			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
-			if (flags.Keys.Any(name => !existFiles.Contains(name))) {
-				GenerateImages(flags);
-			}
-
-			LoadImages();
-
-			BotClient.OnMessage += BotOnMessage;
-			BotClient.OnCallbackQuery += BotOnCallbackQuery;
-			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
-
-			Log("Started!");
-			Timer clearTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-			await ShutdownSemaphore.WaitAsync();
-			clearTimer.Dispose();
-			foreach ((_, Image image) in Images) {
-				image.Dispose();
-			}
-
-			File.WriteAllText("config.json", JsonConvert.SerializeObject(UserSettings));
-			BotClient.StopReceiving();
-		}
 
 		private static async void BotOnCallbackQuery(object sender, CallbackQueryEventArgs e) {
 			if (e?.CallbackQuery == null) {
@@ -122,7 +81,7 @@ namespace RainbowAvatarBot {
 			long chatID = e.Message.Chat.Id;
 			if (LastUserMessages.TryGetValue(senderID, out DateTime time)) {
 				LastUserMessages[senderID] = DateTime.UtcNow;
-				if (time.AddSeconds(3) > DateTime.UtcNow) {
+				if (time.AddSeconds(1) > DateTime.UtcNow) {
 					return;
 				}
 			} else {
@@ -158,7 +117,7 @@ namespace RainbowAvatarBot {
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
 					using Image pictureImage = await DownloadImageByFileID(picture.FileId);
-					
+
 					pictureImage.Overlay(Images[imageName]);
 
 					await using MemoryStream stream = pictureImage.SaveToPng();
@@ -270,21 +229,6 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<Image> DownloadImageByFileID(string fileID) {
-			MemoryStream stream = new MemoryStream();
-			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
-
-		#if SYSTEMDRAWING
-			return Image.FromStream(stream);
-		#else
-			try {
-				return SixLabors.ImageSharp.Image.Load<Rgba32>(stream);
-			} finally {
-				stream.Dispose();
-			}
-		#endif
-		}
-
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
 			InlineKeyboardButton[] inlineKeyboardButtons = buttons.ToArray();
 			int buttonCount = inlineKeyboardButtons.Length;
@@ -308,6 +252,21 @@ namespace RainbowAvatarBot {
 			foreach ((int userID, _) in LastUserMessages.Where(x => x.Value.AddSeconds(3) < DateTime.UtcNow)) {
 				LastUserMessages.TryRemove(userID, out _);
 			}
+		}
+
+		private static async Task<Image> DownloadImageByFileID(string fileID) {
+			MemoryStream stream = new MemoryStream();
+			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
+
+		#if SYSTEMDRAWING
+			return Image.FromStream(stream);
+		#else
+			try {
+				return SixLabors.ImageSharp.Image.Load<Rgba32>(stream);
+			} finally {
+				stream.Dispose();
+			}
+		#endif
 		}
 
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
@@ -357,6 +316,47 @@ namespace RainbowAvatarBot {
 			string result = $"{DateTime.UtcNow}|{strToLog}";
 			Console.WriteLine(result);
 			File.AppendAllText("log.txt", result + Environment.NewLine);
+		}
+
+		private static async Task Main() {
+			if (File.Exists("config.json")) {
+				UserSettings = JsonConvert.DeserializeObject<ConcurrentDictionary<int, string>>(File.ReadAllText("config.json"));
+			}
+
+			Log("Starting " + nameof(RainbowAvatarBot));
+			string token = File.ReadAllText("token.txt");
+			BotClient = new TelegramBotClient(token);
+			if (!await BotClient.TestApiAsync()) {
+				Log("Error when starting bot!");
+				return;
+			}
+
+			if (!Directory.Exists("images")) {
+				Directory.CreateDirectory("images");
+			}
+
+			Dictionary<string, uint[]> flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
+			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
+			if (flags.Keys.Any(name => !existFiles.Contains(name))) {
+				GenerateImages(flags);
+			}
+
+			LoadImages();
+
+			BotClient.OnMessage += BotOnMessage;
+			BotClient.OnCallbackQuery += BotOnCallbackQuery;
+			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
+
+			Log("Started!");
+			Timer clearTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+			await ShutdownSemaphore.WaitAsync();
+			clearTimer.Dispose();
+			foreach ((_, Image image) in Images) {
+				image.Dispose();
+			}
+
+			File.WriteAllText("config.json", JsonConvert.SerializeObject(UserSettings));
+			BotClient.StopReceiving();
 		}
 	}
 }
