@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Drawing.Imaging;
 #else
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -158,11 +157,11 @@ namespace RainbowAvatarBot {
 
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-					using ImageWithStream pictureImageWithStream = await DownloadImageByFileID(picture.FileId);
+					using Image pictureImage = await DownloadImageByFileID(picture.FileId);
 					
-					pictureImageWithStream.Image.Overlay(Images[imageName]);
+					pictureImage.Overlay(Images[imageName]);
 
-					await using MemoryStream stream = pictureImageWithStream.Image.SaveToPng();
+					await using MemoryStream stream = pictureImage.SaveToPng();
 					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 					break;
@@ -173,11 +172,11 @@ namespace RainbowAvatarBot {
 					string command = args[0].ToUpperInvariant();
 					switch (command) {
 						case "START": {
-							await BotClient.SendTextMessageAsync(chatID, "Welcome to the Avatar Rainbowifier bot 🏳️‍🌈! It can put a" +
-							                                             " LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just" +
-							                                             " send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay," +
-							                                             " enter /settings.\n" +
-							                                             " Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
+							await BotClient.SendTextMessageAsync(chatID, "Welcome to the Avatar Rainbowifier bot 🏳️‍🌈! It can put a " +
+							                                             "LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just " +
+							                                             "send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay, " +
+							                                             "enter /settings.\n" +
+							                                             "Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
@@ -208,11 +207,11 @@ namespace RainbowAvatarBot {
 								}
 
 								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-								using ImageWithStream avatarImageWithStream = await DownloadImageByFileID(avatar.FileId);
+								using Image avatarImage = await DownloadImageByFileID(avatar.FileId);
 
-								avatarImageWithStream.Image.Overlay(Images[imageName]);
+								avatarImage.Overlay(Images[imageName]);
 
-								await using MemoryStream stream = avatarImageWithStream.Image.SaveToPng();
+								await using MemoryStream stream = avatarImage.SaveToPng();
 								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId);
 							} catch (Exception ex) {
 								Log(ex.ToString());
@@ -233,11 +232,11 @@ namespace RainbowAvatarBot {
 
 							PhotoSize picture = e.Message.ReplyToMessage.Photo.OrderByDescending(photo => photo.Height).First();
 							Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-							using ImageWithStream pictureImageWithStream = await DownloadImageByFileID(picture.FileId);
+							using Image pictureImage = await DownloadImageByFileID(picture.FileId);
 
-							pictureImageWithStream.Image.Overlay(Images[imageName]);
+							pictureImage.Overlay(Images[imageName]);
 
-							await using MemoryStream stream = pictureImageWithStream.Image.SaveToPng();
+							await using MemoryStream stream = pictureImage.SaveToPng();
 							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 							break;
@@ -271,11 +270,19 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<ImageWithStream> DownloadImageByFileID(string fileID) {
+		private static async Task<Image> DownloadImageByFileID(string fileID) {
 			MemoryStream stream = new MemoryStream();
 			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
 
-			return new ImageWithStream(stream);
+		#if SYSTEMDRAWING
+			return Image.FromStream(stream);
+		#else
+			try {
+				return SixLabors.ImageSharp.Image.Load<Rgba32>(stream);
+			} finally {
+				stream.Dispose();
+			}
+		#endif
 		}
 
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
