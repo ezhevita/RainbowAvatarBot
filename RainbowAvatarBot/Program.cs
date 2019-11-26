@@ -158,10 +158,11 @@ namespace RainbowAvatarBot {
 
 					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
 					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-					using Image pictureImage = await DownloadImageByFileID(picture.FileId);
+					using ImageWithStream pictureImageWithStream = await DownloadImageByFileID(picture.FileId);
+					
+					pictureImageWithStream.Image.Overlay(Images[imageName]);
 
-					pictureImage.Overlay(Images[imageName]);
-					await using MemoryStream stream = pictureImage.SaveToPng();
+					await using MemoryStream stream = pictureImageWithStream.Image.SaveToPng();
 					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 					break;
@@ -207,10 +208,11 @@ namespace RainbowAvatarBot {
 								}
 
 								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-								using Image avatarImage = await DownloadImageByFileID(avatar.FileId);
-								await using MemoryStream stream = avatarImage.SaveToPng();
+								using ImageWithStream avatarImageWithStream = await DownloadImageByFileID(avatar.FileId);
 
-								avatarImage.Overlay(Images[imageName]);
+								avatarImageWithStream.Image.Overlay(Images[imageName]);
+
+								await using MemoryStream stream = avatarImageWithStream.Image.SaveToPng();
 								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId);
 							} catch (Exception ex) {
 								Log(ex.ToString());
@@ -231,10 +233,11 @@ namespace RainbowAvatarBot {
 
 							PhotoSize picture = e.Message.ReplyToMessage.Photo.OrderByDescending(photo => photo.Height).First();
 							Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-							using Image pictureImage = await DownloadImageByFileID(picture.FileId);
+							using ImageWithStream pictureImageWithStream = await DownloadImageByFileID(picture.FileId);
 
-							pictureImage.Overlay(Images[imageName]);
-							await using MemoryStream stream = pictureImage.SaveToPng();
+							pictureImageWithStream.Image.Overlay(Images[imageName]);
+
+							await using MemoryStream stream = pictureImageWithStream.Image.SaveToPng();
 							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
 
 							break;
@@ -268,16 +271,11 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<Image> DownloadImageByFileID(string fileID) {
-			await using MemoryStream stream = new MemoryStream();
+		private static async Task<ImageWithStream> DownloadImageByFileID(string fileID) {
+			MemoryStream stream = new MemoryStream();
 			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
 
-		#if SYSTEMDRAWING
-			return Image.FromStream(stream);
-		#else
-			stream.Position = 0;
-			return SixLabors.ImageSharp.Image.Load<Rgba32>(stream, new JpegDecoder());
-		#endif
+			return new ImageWithStream(stream);
 		}
 
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
