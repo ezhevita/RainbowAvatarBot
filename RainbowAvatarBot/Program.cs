@@ -32,7 +32,9 @@ namespace RainbowAvatarBot {
 
 		private static readonly ResultCache ResultCache = new ResultCache();
 
-		private static readonly ConcurrentDictionary<int, DateTime> LastUserMessages = new ConcurrentDictionary<int, DateTime>();
+		private static readonly Timer ClearUsersTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new ConcurrentDictionary<int, DateTime>();
+		private static readonly Timer ResetTimer = new Timer(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
 
@@ -81,14 +83,6 @@ namespace RainbowAvatarBot {
 
 			int senderID = e.Message.From.Id;
 			long chatID = e.Message.Chat.Id;
-			if (LastUserMessages.TryGetValue(senderID, out DateTime time)) {
-				LastUserMessages[senderID] = DateTime.UtcNow;
-				if (time.AddSeconds(1) > DateTime.UtcNow) {
-					return;
-				}
-			} else {
-				LastUserMessages.TryAdd(senderID, DateTime.UtcNow);
-			}
 
 			string[] args = {""};
 			string textMessage = e.Message.Text ?? e.Message.Caption;
@@ -232,8 +226,8 @@ namespace RainbowAvatarBot {
 		}
 
 		private static void ClearUsers() {
-			foreach ((int userID, _) in LastUserMessages.Where(x => x.Value.AddSeconds(3) < DateTime.UtcNow)) {
-				LastUserMessages.TryRemove(userID, out _);
+			foreach ((int userID, _) in LastUserImageGenerations.Where(x => x.Value.AddSeconds(3) < DateTime.UtcNow)) {
+				LastUserImageGenerations.TryRemove(userID, out _);
 			}
 		}
 
@@ -331,32 +325,48 @@ namespace RainbowAvatarBot {
 			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
 
 			Log("Started!");
-			Timer clearTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 			await ShutdownSemaphore.WaitAsync();
-			clearTimer.Dispose();
+			ClearUsersTimer.Dispose();
+			ResetTimer.Dispose();
 			foreach ((_, Image image) in Images) {
 				image.Dispose();
 			}
 
-			File.WriteAllText("config.json", JsonConvert.SerializeObject(UserSettings));
 			BotClient.StopReceiving();
 		}
 
 		private static async Task ProcessAndSend(string imageID, string overlayName, Message message) {
 			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
 
+			bool isCached;
 			Stopwatch sw = Stopwatch.StartNew();
-			InputMedia resultImage = new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
-			sw.Stop();
-			//InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
+			InputMedia resultImage;
+			try {
+				// ReSharper disable once AssignmentInConditionalExpression
+				if (isCached = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID)) {
+					resultImage = cachedResultImageID;
+				} else {
+					int senderID = message.From.Id;
+					if (LastUserImageGenerations.TryGetValue(senderID, out DateTime time)) {
+						LastUserImageGenerations[senderID] = DateTime.UtcNow;
+						if (time.AddSeconds(1) > DateTime.UtcNow) {
+							return;
+						}
+					} else {
+						LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
+					}
 
-			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D " + sw.ElapsedMilliseconds, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+					resultImage = new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
+				}
+			} finally {
+				sw.Stop();
+			}
+			
 
-			/*
-			if (cachedResultImageID == null) {
+			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, $"Here it is! I hope you like the result :D (generated in {sw.ElapsedMilliseconds} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+			if (!isCached) {
 				ResultCache.TryAdd(imageID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 			}
-			*/
 		}
 
 		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {

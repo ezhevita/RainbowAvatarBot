@@ -8,7 +8,6 @@ using System.Runtime.InteropServices;
 #else
 using System.Diagnostics.CodeAnalysis;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.ColorSpaces.Conversion;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -26,22 +25,17 @@ namespace RainbowAvatarBot {
 			destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
 
 			using Graphics graphics = Graphics.FromImage(destImage);
-			//graphics.CompositingMode = CompositingMode.SourceCopy;
-			//graphics.CompositingQuality = CompositingQuality.HighQuality;
+			graphics.CompositingMode = CompositingMode.SourceCopy;
+			graphics.CompositingQuality = CompositingQuality.HighQuality;
 			graphics.InterpolationMode = useHighQualityInterpolation ? InterpolationMode.HighQualityBicubic : InterpolationMode.NearestNeighbor;
-			//graphics.SmoothingMode = SmoothingMode.HighQuality;
-			//graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+			graphics.SmoothingMode = SmoothingMode.HighQuality;
+			graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
 			using ImageAttributes wrapMode = new ImageAttributes();
 			wrapMode.SetWrapMode(WrapMode.TileFlipXY);
 			graphics.DrawImage(image, destRect, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, wrapMode);
 
 			return destImage;
-		}
-
-		private static bool IsBrightPicture(this Image image) {
-			Bitmap pixel = ResizeImage(image, 1, 1);
-			return pixel.GetPixel(0, 0).GetBrightness() > 0.5;
 		}
 
 		private static void OverlayHardLight(this Image sourceImage, Image overlayImage) {
@@ -99,19 +93,10 @@ namespace RainbowAvatarBot {
 			return output;
 		}
 
-		private static void OverlayNormal(this Image sourceImage, Image overlayImage) {
-			using Graphics graphics = Graphics.FromImage(sourceImage);
-			graphics.DrawImage(overlayImage.SetOpacity(0.5f), 0, 0);
-		}
-
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
 			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height, false);
 			resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
-			if (sourceImage.IsBrightPicture()) {
-				sourceImage.OverlayHardLight(resized);
-			} else {
-				sourceImage.OverlayNormal(resized);
-			}
+			sourceImage.OverlayHardLight(resized);
 		}
 
 		internal static MemoryStream SaveToPng(this Image image) {
@@ -121,19 +106,11 @@ namespace RainbowAvatarBot {
 			return stream;
 		}
 	#else
-		private static readonly ColorSpaceConverter Converter = new ColorSpaceConverter();
-
-		private static bool IsBrightPicture(this Image<Rgba32> image) {
-			using Image<Rgba32> pixelImage = image.Clone(img => img.Resize(1, 1, new BicubicResampler()));
-			float calulcatedLight = Converter.ToHsl(pixelImage[0, 0]).L;
-			return calulcatedLight >= 0.5;
-		}
-
 		[SuppressMessage("ReSharper", "AccessToDisposedClosure")]
 		[SuppressMessage("ReSharper", "ImplicitlyCapturedClosure")]
 		internal static void Overlay(this Image<Rgba32> sourceImage, Image<Rgba32> overlayImage) {
 			using Image<Rgba32> resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height, new NearestNeighborResampler()));
-			sourceImage.Mutate(img => img.DrawImage(resized, Point.Empty, sourceImage.IsBrightPicture() ? PixelColorBlendingMode.HardLight : PixelColorBlendingMode.Normal, 0.5f));
+			sourceImage.Mutate(img => img.DrawImage(resized, Point.Empty, PixelColorBlendingMode.HardLight, 0.5f));
 		}
 
 		internal static MemoryStream SaveToPng(this Image<Rgba32> image) {
