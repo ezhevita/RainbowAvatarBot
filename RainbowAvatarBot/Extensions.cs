@@ -19,18 +19,18 @@ using SixLabors.Primitives;
 namespace RainbowAvatarBot {
 	internal static class Extensions {
 	#if SYSTEMDRAWING
-		private static Bitmap ResizeImage(Image image, int width, int height) {
+		private static Bitmap ResizeImage(Image image, int width, int height, bool useHighQualityInterpolation = true) {
 			Rectangle destRect = new Rectangle(0, 0, width, height);
 			Bitmap destImage = new Bitmap(width, height);
 
 			destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
 
 			using Graphics graphics = Graphics.FromImage(destImage);
-			graphics.CompositingMode = CompositingMode.SourceCopy;
-			graphics.CompositingQuality = CompositingQuality.HighQuality;
-			graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-			graphics.SmoothingMode = SmoothingMode.HighQuality;
-			graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+			//graphics.CompositingMode = CompositingMode.SourceCopy;
+			//graphics.CompositingQuality = CompositingQuality.HighQuality;
+			graphics.InterpolationMode = useHighQualityInterpolation ? InterpolationMode.HighQualityBicubic : InterpolationMode.NearestNeighbor;
+			//graphics.SmoothingMode = SmoothingMode.HighQuality;
+			//graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
 			using ImageAttributes wrapMode = new ImageAttributes();
 			wrapMode.SetWrapMode(WrapMode.TileFlipXY);
@@ -105,7 +105,7 @@ namespace RainbowAvatarBot {
 		}
 
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
-			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height);
+			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height, false);
 			resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
 			if (sourceImage.IsBrightPicture()) {
 				sourceImage.OverlayHardLight(resized);
@@ -132,7 +132,7 @@ namespace RainbowAvatarBot {
 		[SuppressMessage("ReSharper", "AccessToDisposedClosure")]
 		[SuppressMessage("ReSharper", "ImplicitlyCapturedClosure")]
 		internal static void Overlay(this Image<Rgba32> sourceImage, Image<Rgba32> overlayImage) {
-			using Image<Rgba32> resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height));
+			using Image<Rgba32> resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height, new NearestNeighborResampler()));
 			sourceImage.Mutate(img => img.DrawImage(resized, Point.Empty, sourceImage.IsBrightPicture() ? PixelColorBlendingMode.HardLight : PixelColorBlendingMode.Normal, 0.5f));
 		}
 
