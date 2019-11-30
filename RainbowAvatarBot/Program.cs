@@ -244,6 +244,7 @@ namespace RainbowAvatarBot {
 			return Image.FromStream(stream);
 		#else
 			try {
+				stream.Position = 0;
 				return SixLabors.ImageSharp.Image.Load<Rgba32>(stream);
 			} finally {
 				stream.Dispose();
