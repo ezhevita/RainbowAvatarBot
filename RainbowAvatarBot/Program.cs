@@ -1,15 +1,4 @@
-﻿#if SYSTEMDRAWING
-using System.Drawing;
-using System.Drawing.Imaging;
-#else
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
-using RectangleF = SixLabors.Primitives.RectangleF;
-#endif
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -23,6 +12,17 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using File = System.IO.File;
+#if SYSTEMDRAWING
+using System.Drawing;
+using System.Drawing.Imaging;
+#else
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
+using RectangleF = SixLabors.Primitives.RectangleF;
+#endif
 
 namespace RainbowAvatarBot {
 	internal static class Program {
