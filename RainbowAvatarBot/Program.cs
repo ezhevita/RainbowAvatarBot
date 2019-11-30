@@ -1,4 +1,15 @@
-﻿using System;
+﻿#if SYSTEMDRAWING
+using System.Drawing;
+using System.Drawing.Imaging;
+#else
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
+using RectangleF = SixLabors.Primitives.RectangleF;
+#endif
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -12,18 +23,6 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using File = System.IO.File;
-
-#if SYSTEMDRAWING
-using System.Drawing;
-using System.Drawing.Imaging;
-#else
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using Image = SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>;
-using RectangleF = SixLabors.Primitives.RectangleF;
-#endif
 
 namespace RainbowAvatarBot {
 	internal static class Program {
@@ -211,17 +210,6 @@ namespace RainbowAvatarBot {
 				}
 			}
 		}
-		
-		private static async Task ProcessAndSend(string imageID, string overlayName, Message message)
-		{
-			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
-
-			InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
-			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
-
-			if (cachedResultImageID == null)
-				ResultCache.TryAdd(imageID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
-		}
 
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
 			InlineKeyboardButton[] inlineKeyboardButtons = buttons.ToArray();
@@ -240,14 +228,6 @@ namespace RainbowAvatarBot {
 			}
 
 			return new InlineKeyboardMarkup(buttonRows);
-		}
-
-		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {
-			using Image image = await DownloadImageByFileID(fileId);
-					
-			image.Overlay(Images[overlayName]);
-			
-			return image.SaveToPng();
 		}
 
 		private static void ClearUsers() {
@@ -359,6 +339,25 @@ namespace RainbowAvatarBot {
 
 			File.WriteAllText("config.json", JsonConvert.SerializeObject(UserSettings));
 			BotClient.StopReceiving();
+		}
+
+		private static async Task ProcessAndSend(string imageID, string overlayName, Message message) {
+			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
+
+			InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
+			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+
+			if (cachedResultImageID == null) {
+				ResultCache.TryAdd(imageID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
+			}
+		}
+
+		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {
+			using Image image = await DownloadImageByFileID(fileId);
+
+			image.Overlay(Images[overlayName]);
+
+			return image.SaveToPng();
 		}
 	}
 }
