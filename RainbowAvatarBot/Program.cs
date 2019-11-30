@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -253,29 +253,28 @@ namespace RainbowAvatarBot {
 		}
 
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
-			const int flagSize = 1024;
 			foreach ((string name, uint[] rgbValues) in flags) {
 			#if SYSTEMDRAWING
-				using Bitmap image = new Bitmap(flagSize, flagSize);
+				using Bitmap image = new Bitmap(1, rgbValues.Length);
 				using Graphics graphics = Graphics.FromImage(image);
 
 				byte index = 0;
 				foreach (uint rgbValue in rgbValues) {
 					using SolidBrush brush = new SolidBrush(Color.FromArgb((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)));
-					graphics.FillRectangle(brush, new RectangleF(0, (int) Math.Round((float) flagSize / rgbValues.Length * index), flagSize, (int) Math.Round((float) flagSize / rgbValues.Length * (index + 1))));
+					graphics.FillRectangle(brush, new RectangleF(0, index, 1, 1));
 					index++;
 				}
 
 				image.Save(Path.Join("images", $"{name}.png"), ImageFormat.Png);
 			#else
-				using Image<Rgba32> image = new Image<Rgba32>(flagSize, flagSize);
+				using Image<Rgba32> image = new Image<Rgba32>(1, rgbValues.Length);
 				byte index = 0;
 				foreach (uint rgbValue in rgbValues) {
 					byte r = (byte) (rgbValue >> 16);
 					byte g = (byte) ((rgbValue >> 8) & 0xFF);
 					byte b = (byte) (rgbValue & 0xFF);
 					byte i = index;
-					image.Mutate(img => img.Fill(new Rgba32(r, g, b), new RectangleF(0, (int) Math.Round((float) flagSize / rgbValues.Length * i), flagSize, (int) Math.Round((float) flagSize / rgbValues.Length * (i + 1)))));
+					image.Mutate(img => img.Fill(new Rgba32(r, g, b), new RectangleF(0, i, 1, 1)));
 					index++;
 				}
 
