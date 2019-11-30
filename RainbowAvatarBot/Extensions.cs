@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 #else
 using System.Diagnostics.CodeAnalysis;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
@@ -18,22 +18,17 @@ using SixLabors.Primitives;
 namespace RainbowAvatarBot {
 	internal static class Extensions {
 	#if SYSTEMDRAWING
-		private static Bitmap ResizeImage(Image image, int width, int height, bool useHighQualityInterpolation = true) {
-			Rectangle destRect = new Rectangle(0, 0, width, height);
+		private static Bitmap ResizeImage(Image image, int width, int height) {
 			Bitmap destImage = new Bitmap(width, height);
 
 			destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
 
 			using Graphics graphics = Graphics.FromImage(destImage);
-			graphics.CompositingMode = CompositingMode.SourceCopy;
-			graphics.CompositingQuality = CompositingQuality.HighQuality;
-			graphics.InterpolationMode = useHighQualityInterpolation ? InterpolationMode.HighQualityBicubic : InterpolationMode.NearestNeighbor;
+			graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
 			graphics.SmoothingMode = SmoothingMode.HighQuality;
 			graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
 
-			using ImageAttributes wrapMode = new ImageAttributes();
-			wrapMode.SetWrapMode(WrapMode.TileFlipXY);
-			graphics.DrawImage(image, destRect, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, wrapMode);
+			graphics.DrawImage(image, 0, 0, width, height);
 
 			return destImage;
 		}
@@ -41,7 +36,7 @@ namespace RainbowAvatarBot {
 		private static void OverlayHardLight(this Image sourceImage, Image overlayImage) {
 			static float ProcessHardLight(float source, float overlay) => overlay < 0.5 ? 2 * source * overlay : 1 - 2 * (1 - source) * (1 - overlay);
 			Bitmap sourceBitmap = (Bitmap) sourceImage;
-			Bitmap overlayBitmap = (Bitmap) overlayImage.Clone();
+			Bitmap overlayBitmap = (Bitmap) overlayImage;
 			Bitmap newOverlayBitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height);
 
 			Rectangle rect = new Rectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height);
@@ -94,14 +89,14 @@ namespace RainbowAvatarBot {
 		}
 
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
-			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height, false);
+			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height);
 			resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
 			sourceImage.OverlayHardLight(resized);
 		}
 
-		internal static MemoryStream SaveToPng(this Image image) {
+		internal static MemoryStream SaveToBmp(this Image image) {
 			MemoryStream stream = new MemoryStream();
-			image.Save(stream, ImageFormat.Png);
+			image.Save(stream, ImageFormat.Bmp);
 			stream.Position = 0;
 			return stream;
 		}
@@ -113,9 +108,9 @@ namespace RainbowAvatarBot {
 			sourceImage.Mutate(img => img.DrawImage(resized, Point.Empty, PixelColorBlendingMode.HardLight, 0.5f));
 		}
 
-		internal static MemoryStream SaveToPng(this Image<Rgba32> image) {
+		internal static MemoryStream SaveToBmp(this Image<Rgba32> image) {
 			MemoryStream stream = new MemoryStream();
-			image.Save(stream, new PngEncoder());
+			image.Save(stream, new BmpEncoder());
 			stream.Position = 0;
 			return stream;
 		}

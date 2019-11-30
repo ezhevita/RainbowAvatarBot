@@ -361,7 +361,6 @@ namespace RainbowAvatarBot {
 			} finally {
 				sw.Stop();
 			}
-			
 
 			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, $"Here it is! I hope you like the result :D (generated in {sw.ElapsedMilliseconds} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 			if (!isCached) {
@@ -374,7 +373,7 @@ namespace RainbowAvatarBot {
 
 			image.Overlay(Images[overlayName]);
 
-			return image.SaveToPng();
+			return image.SaveToBmp();
 		}
 	}
 }
