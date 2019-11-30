@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -344,12 +345,18 @@ namespace RainbowAvatarBot {
 		private static async Task ProcessAndSend(string imageID, string overlayName, Message message) {
 			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
 
-			InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
-			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+			Stopwatch sw = Stopwatch.StartNew();
+			InputMedia resultImage = new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
+			sw.Stop();
+			//InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
 
+			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D " + sw.ElapsedMilliseconds, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+
+			/*
 			if (cachedResultImageID == null) {
 				ResultCache.TryAdd(imageID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 			}
+			*/
 		}
 
 		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {
