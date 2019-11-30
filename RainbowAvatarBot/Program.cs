@@ -30,6 +30,8 @@ namespace RainbowAvatarBot {
 		private const int AdminID = 204723509;
 		private static readonly Dictionary<string, Image> Images = new Dictionary<string, Image>();
 
+		private static readonly ResultCache ResultCache = new ResultCache();
+
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserMessages = new ConcurrentDictionary<int, DateTime>();
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
@@ -110,19 +112,12 @@ namespace RainbowAvatarBot {
 
 			switch (e.Message.Type) {
 				case MessageType.Photo when (e.Message.Chat.Type == ChatType.Private) || (args[0].ToUpperInvariant() == "COLORIZE"): {
-					if (!UserSettings.TryGetValue(senderID, out string imageName)) {
-						imageName = "LGBT";
+					if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+						overlayName = "LGBT";
 					}
 
-					PhotoSize picture = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
-					Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-					using Image pictureImage = await DownloadImageByFileID(picture.FileId);
-
-					pictureImage.Overlay(Images[imageName]);
-
-					await using MemoryStream stream = pictureImage.SaveToPng();
-					await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
-
+					PhotoSize sourceImage = e.Message.Photo.OrderByDescending(photo => photo.Height).First();
+					await ProcessAndSend(sourceImage.FileId, overlayName, e.Message);
 					break;
 				}
 
@@ -146,8 +141,8 @@ namespace RainbowAvatarBot {
 
 						case "AVATAR": {
 							try {
-								if (!UserSettings.TryGetValue(senderID, out string imageName)) {
-									imageName = "LGBT";
+								if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+									overlayName = "LGBT";
 								}
 
 								UserProfilePhotos avatars;
@@ -165,13 +160,8 @@ namespace RainbowAvatarBot {
 									}
 								}
 
-								PhotoSize avatar = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-								using Image avatarImage = await DownloadImageByFileID(avatar.FileId);
-
-								avatarImage.Overlay(Images[imageName]);
-
-								await using MemoryStream stream = avatarImage.SaveToPng();
-								await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "avatar.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.ReplyToMessage?.MessageId ?? e.Message.MessageId);
+								PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
+								await ProcessAndSend(sourceImage.FileId, overlayName, e.Message);
 							} catch (Exception ex) {
 								Log(ex.ToString());
 								try {
@@ -185,19 +175,12 @@ namespace RainbowAvatarBot {
 						}
 
 						case "COLORIZE" when e.Message.ReplyToMessage?.Type == MessageType.Photo: {
-							if (!UserSettings.TryGetValue(senderID, out string imageName)) {
-								imageName = "LGBT";
+							if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+								overlayName = "LGBT";
 							}
 
-							PhotoSize picture = e.Message.ReplyToMessage.Photo.OrderByDescending(photo => photo.Height).First();
-							Log(senderID + "|" + nameof(MessageType.Photo) + "|" + picture.FileId);
-							using Image pictureImage = await DownloadImageByFileID(picture.FileId);
-
-							pictureImage.Overlay(Images[imageName]);
-
-							await using MemoryStream stream = pictureImage.SaveToPng();
-							await BotClient.SendPhotoAsync(chatID, new InputMedia(stream, "image.png"), "Here it is! I hope you like the result :D", replyToMessageId: e.Message.MessageId);
-
+							PhotoSize sourceImage = e.Message.ReplyToMessage.Photo.OrderByDescending(photo => photo.Height).First();
+							await ProcessAndSend(sourceImage.FileId, overlayName, e.Message);
 							break;
 						}
 
@@ -228,6 +211,17 @@ namespace RainbowAvatarBot {
 				}
 			}
 		}
+		
+		private static async Task ProcessAndSend(string imageID, string overlayName, Message message)
+		{
+			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
+
+			InputMedia resultImage = ResultCache.TryGetValue(imageID, overlayName, out string cachedResultImageID) ? cachedResultImageID : new InputMedia(await ProcessImage(imageID, overlayName), "image.png");
+			Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, "Here it is! I hope you like the result :D", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+
+			if (cachedResultImageID == null)
+				ResultCache.TryAdd(imageID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
+		}
 
 		private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons) {
 			InlineKeyboardButton[] inlineKeyboardButtons = buttons.ToArray();
@@ -246,6 +240,14 @@ namespace RainbowAvatarBot {
 			}
 
 			return new InlineKeyboardMarkup(buttonRows);
+		}
+
+		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {
+			using Image image = await DownloadImageByFileID(fileId);
+					
+			image.Overlay(Images[overlayName]);
+			
+			return image.SaveToPng();
 		}
 
 		private static void ClearUsers() {
