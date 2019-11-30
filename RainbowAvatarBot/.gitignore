@@ -4,5 +4,5 @@ out
 gen
 [Bb]in/
 [Oo]bj/
-*.json
+config.json
 *.txt
