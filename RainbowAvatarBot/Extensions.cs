@@ -90,7 +90,12 @@ namespace RainbowAvatarBot {
 
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
 			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height);
-			resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
+			try {
+				resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
+			} catch (ArgumentException) {
+				// ignored
+			}
+
 			sourceImage.OverlayHardLight(resized);
 		}
 
