@@ -68,7 +68,7 @@ namespace RainbowAvatarBot {
 				sourceBitmap.SetResolution(newOverlayBitmap.HorizontalResolution, newOverlayBitmap.VerticalResolution);
 			}
 
-			using Graphics graphics = Graphics.FromImage(sourceImage);
+			using Graphics graphics = Graphics.FromImage(sourceBitmap);
 			graphics.DrawImage(newOverlayBitmap.SetOpacity(0.5f), 0, 0);
 		}
 
