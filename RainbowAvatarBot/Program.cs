@@ -355,48 +355,47 @@ namespace RainbowAvatarBot {
 			}
 
 			bool isCached;
-			Stopwatch sw = Stopwatch.StartNew();
+			long elapsedMs = 0;
 			InputMedia resultImage;
-			try {
-				// ReSharper disable once AssignmentInConditionalExpression
-				if (isCached = ResultCache.TryGetValue(imageUniqueID, overlayName, out string cachedResultImageID)) {
-					resultImage = cachedResultImageID;
-				} else {
-					int senderID = message.From.Id;
-					if (LastUserImageGenerations.TryGetValue(senderID, out DateTime time)) {
-						LastUserImageGenerations[senderID] = DateTime.UtcNow;
-						if (time.AddSeconds(1) > DateTime.UtcNow) {
-							return;
-						}
-					} else {
-						LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
+			// ReSharper disable once AssignmentInConditionalExpression
+			if (isCached = ResultCache.TryGetValue(imageUniqueID, overlayName, out string cachedResultImageID)) {
+				resultImage = cachedResultImageID;
+			} else {
+				int senderID = message.From.Id;
+				if (LastUserImageGenerations.TryGetValue(senderID, out DateTime time)) {
+					LastUserImageGenerations[senderID] = DateTime.UtcNow;
+					if (time.AddSeconds(1) > DateTime.UtcNow) {
+						return;
 					}
-
-					MemoryStream processedImage = await ProcessImage(imageID, overlayName);
-					resultImage = new InputMedia(processedImage, "image.png");
+				} else {
+					LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
 				}
-			} finally {
-				sw.Stop();
+
+				MemoryStream processedImage;
+				(processedImage, elapsedMs) = await ProcessImage(imageID, overlayName);
+				resultImage = new InputMedia(processedImage, "image.png");
 			}
 
 			if (isSticker) {
 				Message resultMessage = await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false);
-				await BotClient.SendTextMessageAsync(message.Chat.Id, $"Here it is! I hope you like the result :D (generated in {sw.ElapsedMilliseconds} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+				await BotClient.SendTextMessageAsync(message.Chat.Id, $"Here it is! I hope you like the result :D (generated in {elapsedMs} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Sticker.FileId);
 				}
 			} else {
-				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, $"Here it is! I hope you like the result :D (generated in {sw.ElapsedMilliseconds} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, $"Here it is! I hope you like the result :D (generated in {elapsedMs} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 				}
 			}
 		}
 
-		private static async Task<MemoryStream> ProcessImage(string fileId, string overlayName) {
+		private static async Task<(MemoryStream Image, long Milliseconds)> ProcessImage(string fileId, string overlayName) {
 			using Image image = await DownloadImageByFileID(fileId);
+			Stopwatch sw = Stopwatch.StartNew();
 			image.Overlay(Images[overlayName]);
-			return image.SaveToPng();
+			sw.Stop();
+			return (image.SaveToPng(), sw.ElapsedMilliseconds);
 		}
 	}
 }
