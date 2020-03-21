@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -42,6 +43,8 @@ namespace RainbowAvatarBot {
 				return;
 			}
 
+			SetThreadLocale(e.CallbackQuery.From.LanguageCode);
+
 			string callbackID = e.CallbackQuery.Id;
 			int senderID = e.CallbackQuery.From.Id;
 			string[] args = e.CallbackQuery.Data.Split('_', StringSplitOptions.RemoveEmptyEntries);
@@ -65,13 +68,28 @@ namespace RainbowAvatarBot {
 					}
 
 					await File.WriteAllTextAsync("config.json", JsonConvert.SerializeObject(UserSettings));
-					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, "Changed to " + name + " flag", replyMarkup: InlineKeyboardMarkup.Empty());
+					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, Localization.ChangedSuccessfully, replyMarkup: InlineKeyboardMarkup.Empty());
 					await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success);
 					break;
 				}
 			}
 		}
 
+		private static void SetThreadLocale(string languageCode) {
+			switch (languageCode) {
+				case null:
+				case "":
+				case "ru":
+				case "uk":
+				case "be":
+					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag("ru-RU");
+					break;
+				default:
+					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag(languageCode);
+					break;
+			}
+		}
+		
 		private static async void BotOnMessage(object sender, MessageEventArgs e) {
 			if ((e?.Message == null) || (e.Message.Date < StartedTime)) {
 				return;
@@ -80,10 +98,12 @@ namespace RainbowAvatarBot {
 			int senderID = e.Message.From.Id;
 			long chatID = e.Message.Chat.Id;
 
+			SetThreadLocale(e.Message.From.LanguageCode);
+
 			string[] args = {""};
 			string textMessage = e.Message.Text ?? e.Message.Caption;
 			if (!string.IsNullOrEmpty(textMessage)) {
-				if (string.IsNullOrEmpty(textMessage) || (textMessage[0] != '/')) {
+				if (string.IsNullOrEmpty(textMessage)) {
 					return;
 				}
 
@@ -105,52 +125,33 @@ namespace RainbowAvatarBot {
 					Log(senderID + "|" + nameof(MessageType.Text) + "|" + e.Message.Text);
 					string command = args[0].ToUpperInvariant();
 					switch (command) {
-						case "START": {
-							await BotClient.SendTextMessageAsync(chatID, "Welcome to the Avatar Rainbowifier bot 🏳️‍🌈! It can put a " +
-							                                             "LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just " +
-							                                             "send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay, " +
-							                                             "enter /settings.\n" +
-							                                             "Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
-							break;
-						}
-
 						case "OFF" when senderID == AdminID: {
 							ShutdownSemaphore.Release();
 							break;
 						}
 
 						case "AVATAR": {
-							try {
-								if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
-									overlayName = "LGBT";
-								}
+							if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+								overlayName = "LGBT";
+							}
 
-								UserProfilePhotos avatars;
-								if (e.Message.ReplyToMessage != null) {
-									avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
-									if (avatars.Photos.Length == 0) {
-										await BotClient.SendTextMessageAsync(senderID, "I can't find profile pictures!", replyToMessageId: e.Message.MessageId);
-										return;
-									}
-								} else {
-									avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
-									if (avatars.Photos.Length == 0) {
-										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId);
-										return;
-									}
+							UserProfilePhotos avatars;
+							if (e.Message.ReplyToMessage != null) {
+								avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
+								if (avatars.Photos.Length == 0) {
+									await BotClient.SendTextMessageAsync(senderID, Localization.RepliedUserProfilePictureNotFound, replyToMessageId: e.Message.MessageId);
+									return;
 								}
-
-								PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-								await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message);
-							} catch (Exception ex) {
-								Log(ex.ToString());
-								try {
-									await BotClient.SendTextMessageAsync(chatID, "Some unknown error occured! Please try again or contact developer.", replyToMessageId: e.Message.MessageId);
-								} catch (Exception) {
-									// ignored
+							} else {
+								avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
+								if (avatars.Photos.Length == 0) {
+									await BotClient.SendTextMessageAsync(senderID, Localization.UserProfilePictureNotFound, replyToMessageId: e.Message.MessageId);
+									return;
 								}
 							}
 
+							PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
+							await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message);
 							break;
 						}
 
@@ -177,23 +178,20 @@ namespace RainbowAvatarBot {
 						}
 
 						case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
-							await BotClient.SendTextMessageAsync(chatID, "Settings command must be sent to the private chat!", replyToMessageId: e.Message.MessageId);
+							await BotClient.SendTextMessageAsync(chatID, Localization.SettingsSentToChat, replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
 						case "SETTINGS" when e.Message.Chat.Type == ChatType.Private: {
-							await BotClient.SendTextMessageAsync(chatID, "Select flag:", replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
+							await BotClient.SendTextMessageAsync(chatID, Localization.SelectFlag, replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
 								CallbackData = "SETTINGS_" + name,
-								Text = name + " flag"
+								Text = Localization.ResourceManager.GetString(name)
 							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId);
 							break;
 						}
 
 						default: {
-							if (e.Message.Chat.Type == ChatType.Private) {
-								await BotClient.SendTextMessageAsync(chatID, "Unknown command!", replyToMessageId: e.Message.MessageId);
-							}
-
+							await BotClient.SendTextMessageAsync(chatID, Localization.StartMessage, replyToMessageId: e.Message.MessageId, parseMode: ParseMode.MarkdownV2);
 							break;
 						}
 					}
@@ -219,6 +217,11 @@ namespace RainbowAvatarBot {
 			} catch (Exception ex) {
 				Log("Exception has been thrown!");
 				Log(ex.ToString());
+				try {
+					await BotClient.SendTextMessageAsync(chatID, Localization.ErrorOccured, replyToMessageId: e.Message.MessageId);
+				} catch (Exception) {
+					// ignored
+				}
 			}
 		}
 
