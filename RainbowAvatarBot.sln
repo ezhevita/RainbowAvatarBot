@@ -1,22 +1,31 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RainbowAvatarBot", "RainbowAvatarBot\RainbowAvatarBot.csproj", "{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}"
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29911.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RainbowAvatarBot", "RainbowAvatarBot\RainbowAvatarBot.csproj", "{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
 		DebugDrawing|Any CPU = DebugDrawing|Any CPU
+		Release|Any CPU = Release|Any CPU
 		ReleaseDrawing|Any CPU = ReleaseDrawing|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.ActiveCfg = DebugDrawing|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.Build.0 = DebugDrawing|Any CPU
 		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.ActiveCfg = ReleaseDrawing|Any CPU
-		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.Build.0 = ReleaseDrawing|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.DebugDrawing|Any CPU.Build.0 = Debug|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.ActiveCfg = Release|Any CPU
+		{9F6D2F2E-33DE-463E-9268-6CE7CA36904F}.ReleaseDrawing|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {87A83730-6277-4F3B-8A73-860773F4E402}
 	EndGlobalSection
 EndGlobal

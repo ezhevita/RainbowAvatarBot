@@ -29,6 +29,10 @@ namespace RainbowAvatarBot {
 		private static readonly Timer ResetTimer = new Timer(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
+		private static readonly HashSet<MessageType> SupportedTypes = new HashSet<MessageType>(3) {
+			MessageType.Photo,
+			MessageType.Sticker
+		};
 
 		private static TelegramBotClient BotClient;
 		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
@@ -50,7 +54,7 @@ namespace RainbowAvatarBot {
 				case "SETTINGS": {
 					string name = args[1];
 					if (!Images.ContainsKey(name)) {
-						await BotClient.AnswerCallbackQueryAsync(callbackID, "Invalid name of the flag!");
+						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.InvalidFlagName);
 						return;
 					}
 
@@ -62,7 +66,7 @@ namespace RainbowAvatarBot {
 
 					await File.WriteAllTextAsync("config.json", JsonConvert.SerializeObject(UserSettings));
 					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, "Changed to " + name + " flag", replyMarkup: InlineKeyboardMarkup.Empty());
-					await BotClient.AnswerCallbackQueryAsync(callbackID, "Success!");
+					await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success);
 					break;
 				}
 			}
@@ -97,129 +101,120 @@ namespace RainbowAvatarBot {
 			}
 
 			try {
-				switch (e.Message.Type) {
-					case MessageType.Sticker when e.Message.Chat.Type == ChatType.Private:
-					case MessageType.Photo when (e.Message.Chat.Type == ChatType.Private) || (args[0].ToUpperInvariant() == "COLORIZE"): {
-						if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
-							overlayName = "LGBT";
+				if (e.Message.Type == MessageType.Text) {
+					Log(senderID + "|" + nameof(MessageType.Text) + "|" + e.Message.Text);
+					string command = args[0].ToUpperInvariant();
+					switch (command) {
+						case "START": {
+							await BotClient.SendTextMessageAsync(chatID, "Welcome to the Avatar Rainbowifier bot 🏳️‍🌈! It can put a " +
+							                                             "LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just " +
+							                                             "send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay, " +
+							                                             "enter /settings.\n" +
+							                                             "Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
+							break;
 						}
 
-						string fileID;
-						string uniqueFileID;
-						if (e.Message.Type == MessageType.Photo) {
-							PhotoSize photo = e.Message.Photo.OrderByDescending(size => size.Height).First();
-							fileID = photo.FileId;
-							uniqueFileID = photo.FileUniqueId;
-						} else {
-							Sticker sticker = e.Message.Sticker;
-							fileID = sticker.FileId;
-							uniqueFileID = sticker.FileUniqueId;
+						case "OFF" when senderID == AdminID: {
+							ShutdownSemaphore.Release();
+							break;
 						}
 
-						await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message);
-						break;
-					}
-
-					case MessageType.Text: {
-						Log(senderID + "|" + nameof(MessageType.Text) + "|" + e.Message.Text);
-						string command = args[0].ToUpperInvariant();
-						switch (command) {
-							case "START": {
-								await BotClient.SendTextMessageAsync(chatID, "Welcome to the Avatar Rainbowifier bot 🏳️‍🌈! It can put a " +
-								                                             "LGBT flag (or any other which is in our database) on your profile picture in a few seconds, to do it just " +
-								                                             "send /avatar. Also you can send your own photo to make it rainbow 🌈. To set another flag for overlay, " +
-								                                             "enter /settings.\n" +
-								                                             "Developer of the bot - @Vital_7", replyToMessageId: e.Message.MessageId);
-								break;
-							}
-
-							case "OFF" when senderID == AdminID: {
-								ShutdownSemaphore.Release();
-								break;
-							}
-
-							case "AVATAR": {
-								try {
-									if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
-										overlayName = "LGBT";
-									}
-
-									UserProfilePhotos avatars;
-									if (e.Message.ReplyToMessage != null) {
-										avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
-										if (avatars.Photos.Length == 0) {
-											await BotClient.SendTextMessageAsync(senderID, "I can't find profile pictures!", replyToMessageId: e.Message.MessageId);
-											return;
-										}
-									} else {
-										avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
-										if (avatars.Photos.Length == 0) {
-											await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId);
-											return;
-										}
-									}
-
-									PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-									await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message);
-								} catch (Exception ex) {
-									Log(ex.ToString());
-									try {
-										await BotClient.SendTextMessageAsync(chatID, "Some unknown error occured! Please try again or contact developer.", replyToMessageId: e.Message.MessageId);
-									} catch (Exception) {
-										// ignored
-									}
-								}
-
-								break;
-							}
-
-							case "COLORIZE" when (e.Message.ReplyToMessage?.Type == MessageType.Photo) || (e.Message.ReplyToMessage?.Type == MessageType.Sticker): {
+						case "AVATAR": {
+							try {
 								if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
 									overlayName = "LGBT";
 								}
 
-								Message targetMessage = e.Message.ReplyToMessage;
-								string fileID;
-								string uniqueFileID;
-								if (targetMessage.Type == MessageType.Photo) {
-									PhotoSize photo = targetMessage.Photo.OrderByDescending(size => size.Height).First();
-									fileID = photo.FileId;
-									uniqueFileID = photo.FileUniqueId;
+								UserProfilePhotos avatars;
+								if (e.Message.ReplyToMessage != null) {
+									avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
+									if (avatars.Photos.Length == 0) {
+										await BotClient.SendTextMessageAsync(senderID, "I can't find profile pictures!", replyToMessageId: e.Message.MessageId);
+										return;
+									}
 								} else {
-									Sticker sticker = targetMessage.Sticker;
-									fileID = sticker.FileId;
-									uniqueFileID = sticker.FileUniqueId;
+									avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
+									if (avatars.Photos.Length == 0) {
+										await BotClient.SendTextMessageAsync(senderID, "I can't find your profile picture! Please set it or change your privacy settings so I would be able to see it.", replyToMessageId: e.Message.MessageId);
+										return;
+									}
 								}
 
-								await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message.ReplyToMessage);
-								break;
-							}
-
-							case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
-								await BotClient.SendTextMessageAsync(chatID, "Settings command must be sent to the private chat!", replyToMessageId: e.Message.MessageId);
-								break;
-							}
-
-							case "SETTINGS" when e.Message.Chat.Type == ChatType.Private: {
-								await BotClient.SendTextMessageAsync(chatID, "Select flag:", replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
-									CallbackData = "SETTINGS_" + name,
-									Text = name + " flag"
-								}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId);
-								break;
-							}
-
-							default: {
-								if (e.Message.Chat.Type == ChatType.Private) {
-									await BotClient.SendTextMessageAsync(chatID, "Unknown command!", replyToMessageId: e.Message.MessageId);
+								PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
+								await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message);
+							} catch (Exception ex) {
+								Log(ex.ToString());
+								try {
+									await BotClient.SendTextMessageAsync(chatID, "Some unknown error occured! Please try again or contact developer.", replyToMessageId: e.Message.MessageId);
+								} catch (Exception) {
+									// ignored
 								}
-
-								break;
 							}
+
+							break;
 						}
 
+						case "COLORIZE" when (e.Message.ReplyToMessage?.Type == MessageType.Photo) || (e.Message.ReplyToMessage?.Type == MessageType.Sticker): {
+							if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+								overlayName = "LGBT";
+							}
 
-						break;
+							Message targetMessage = e.Message.ReplyToMessage;
+							string fileID;
+							string uniqueFileID;
+							if (targetMessage.Type == MessageType.Photo) {
+								PhotoSize photo = targetMessage.Photo.OrderByDescending(size => size.Height).First();
+								fileID = photo.FileId;
+								uniqueFileID = photo.FileUniqueId;
+							} else {
+								Sticker sticker = targetMessage.Sticker;
+								fileID = sticker.FileId;
+								uniqueFileID = sticker.FileUniqueId;
+							}
+
+							await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message.ReplyToMessage);
+							break;
+						}
+
+						case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
+							await BotClient.SendTextMessageAsync(chatID, "Settings command must be sent to the private chat!", replyToMessageId: e.Message.MessageId);
+							break;
+						}
+
+						case "SETTINGS" when e.Message.Chat.Type == ChatType.Private: {
+							await BotClient.SendTextMessageAsync(chatID, "Select flag:", replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
+								CallbackData = "SETTINGS_" + name,
+								Text = name + " flag"
+							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId);
+							break;
+						}
+
+						default: {
+							if (e.Message.Chat.Type == ChatType.Private) {
+								await BotClient.SendTextMessageAsync(chatID, "Unknown command!", replyToMessageId: e.Message.MessageId);
+							}
+
+							break;
+						}
 					}
+				} else if (SupportedTypes.Contains(e.Message.Type) && ((e.Message.Chat.Type == ChatType.Private) || ((args.Length > 0) && (args[0].ToUpperInvariant() == "COLORIZE")))) {
+					if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
+						overlayName = "LGBT";
+					}
+
+					string fileID;
+					string uniqueFileID;
+					if (e.Message.Type == MessageType.Photo) {
+						PhotoSize photo = e.Message.Photo.OrderByDescending(size => size.Height).First();
+						fileID = photo.FileId;
+						uniqueFileID = photo.FileUniqueId;
+					} else {
+						Sticker sticker = e.Message.Sticker;
+						fileID = sticker.FileId;
+						uniqueFileID = sticker.FileUniqueId;
+					}
+
+					await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message);
 				}
 			} catch (Exception ex) {
 				Log("Exception has been thrown!");
@@ -252,28 +247,11 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<Image> DownloadImageByFileID(string fileID) {
-			MemoryStream stream = new MemoryStream();
+		private static async Task<byte[]> DownloadFile(string fileID) {
+			await using MemoryStream stream = new MemoryStream();
 			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
 			stream.Position = 0;
-			// WebP check
-			byte[] buffer = new byte[4];
-			await stream.ReadAsync(buffer, 0, 4).ConfigureAwait(false);
-			if (buffer.SequenceEqual(new byte[] {82, 73, 70, 70})) {
-				// RIFF
-				await stream.ReadAsync(new byte[4], 0, 4).ConfigureAwait(false);
-				await stream.ReadAsync(buffer, 0, 4).ConfigureAwait(false);
-				if (buffer.SequenceEqual(new byte[] {87, 69, 66, 80})) {
-					// WEBP
-					stream.Position = 0;
-					byte[] content = new byte[stream.Length];
-					await stream.ReadAsync(content, 0, (int) stream.Length);
-					SimpleDecoder decoder = new SimpleDecoder();
-					return decoder.DecodeFromBytes(content, content.Length);
-				}
-			}
-
-			return Image.FromStream(stream);
+			return stream.ToArray();
 		}
 
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
@@ -355,7 +333,6 @@ namespace RainbowAvatarBot {
 			}
 
 			bool isCached;
-			long elapsedMs = 0;
 			InputMedia resultImage;
 			// ReSharper disable once AssignmentInConditionalExpression
 			if (isCached = ResultCache.TryGetValue(imageUniqueID, overlayName, out string cachedResultImageID)) {
@@ -371,31 +348,55 @@ namespace RainbowAvatarBot {
 					LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
 				}
 
-				MemoryStream processedImage;
-				(processedImage, elapsedMs) = await ProcessImage(imageID, overlayName);
-				resultImage = new InputMedia(processedImage, "image.png");
+				resultImage = await ProcessImage(imageID, overlayName);
 			}
 
 			if (isSticker) {
 				Message resultMessage = await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false);
-				await BotClient.SendTextMessageAsync(message.Chat.Id, $"Here it is! I hope you like the result :D (generated in {elapsedMs} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Sticker.FileId);
 				}
 			} else {
-				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, $"Here it is! I hope you like the result :D (generated in {elapsedMs} ms)", replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 				}
 			}
 		}
 
-		private static async Task<(MemoryStream Image, long Milliseconds)> ProcessImage(string fileId, string overlayName) {
-			using Image image = await DownloadImageByFileID(fileId);
+		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
 			Stopwatch sw = Stopwatch.StartNew();
+			byte[] file = await DownloadFile(fileId);
+
+			sw.Stop();
+			Log("Downloading: " + sw.ElapsedMilliseconds + "ms");
+			sw.Restart();
+			Image image;
+
+			// WebP check, checking if header contains `RIFF` and `WEBP`
+			bool isWebp = file[..4].SequenceEqual(new byte[] {82, 73, 70, 70}) && file[8..12].SequenceEqual(new byte[] {87, 69, 66, 80});
+
+			if (isWebp) {
+				SimpleDecoder decoder = new SimpleDecoder();
+				image = decoder.DecodeFromBytes(file, file.Length);
+			} else {
+				image = Image.FromStream(new MemoryStream(file));
+			}
+
+			sw.Stop();
+			Log("Creating: " + sw.ElapsedMilliseconds + "ms");
+			sw.Restart();
+
 			image.Overlay(Images[overlayName]);
 			sw.Stop();
-			return (image.SaveToPng(), sw.ElapsedMilliseconds);
+			Log("Processing: " + sw.ElapsedMilliseconds + "ms");
+			
+			sw.Restart();
+
+			InputMedia inputMedia = isWebp ? new InputMedia(image.SaveToWebp(), "sticker.webp") : new InputMedia(image.SaveToPng(), "image.png");
+			sw.Stop();
+			Log("Saving: " + sw.ElapsedMilliseconds + "ms");
+			return inputMedia;
 		}
 	}
 }

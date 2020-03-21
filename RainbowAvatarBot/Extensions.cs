@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Imazen.WebP;
 
 namespace RainbowAvatarBot {
 	internal static class Extensions {
@@ -93,6 +94,14 @@ namespace RainbowAvatarBot {
 		internal static MemoryStream SaveToPng(this Image image) {
 			MemoryStream stream = new MemoryStream();
 			image.Save(stream, ImageFormat.Png);
+			stream.Position = 0;
+			return stream;
+		}
+
+		internal static MemoryStream SaveToWebp(this Image image) {
+			MemoryStream stream = new MemoryStream();
+			SimpleEncoder encoder = new SimpleEncoder();
+			encoder.Encode((Bitmap) image, stream, 1);
 			stream.Position = 0;
 			return stream;
 		}
