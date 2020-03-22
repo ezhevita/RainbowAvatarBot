@@ -10,7 +10,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Imazen.WebP;
@@ -480,21 +479,8 @@ namespace RainbowAvatarBot {
 			clonedReferenceObject["ind"] = 3;
 			layersToken.Add(clonedReferenceObject);
 
-			string[] jsonPaths = {"$..nm", "$..mn", "$..ix"};
-			foreach (string jsonPath in jsonPaths) {
-				foreach (JToken token in tokenizedSticker.SelectTokens(jsonPath).ToList()) {
-					token.Parent.Remove();
-				}
-			}
-			
 			string resultJson = tokenizedSticker.ToString(Formatting.None);
-
-			Regex numberRegex = new Regex(@"\d+\.\d{4,}", RegexOptions.Compiled);
-			resultJson = numberRegex.Replace(resultJson, match => Math.Round(float.Parse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture), 3).ToString(CultureInfo.InvariantCulture));
-
-			StringBuilder resultBuilder = new StringBuilder(resultJson);
-
-			return resultBuilder.ToString();
+			return resultJson;
 		}
 		
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
