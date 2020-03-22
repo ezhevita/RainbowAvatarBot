@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,11 +6,16 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Imazen.WebP;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -37,6 +42,9 @@ namespace RainbowAvatarBot {
 
 		private static TelegramBotClient BotClient;
 		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
+		private static JObject GradientOverlay;
+		private static JObject TextOverlay;
+		private static Dictionary<string, uint[]> Flags;
 
 		private static async void BotOnCallbackQuery(object sender, CallbackQueryEventArgs e) {
 			if (e?.CallbackQuery == null) {
@@ -299,14 +307,17 @@ namespace RainbowAvatarBot {
 				return;
 			}
 
+			GradientOverlay = JObject.Parse(await File.ReadAllTextAsync("gradientOverlay.json"));
+			TextOverlay = JObject.Parse(await File.ReadAllTextAsync("textOverlay.json"));
+
 			if (!Directory.Exists("images")) {
 				Directory.CreateDirectory("images");
 			}
 
-			Dictionary<string, uint[]> flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
+			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
 			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
-			if (flags.Keys.Any(name => !existFiles.Contains(name))) {
-				GenerateImages(flags);
+			if (Flags.Keys.Any(name => !existFiles.Contains(name))) {
+				GenerateImages(Flags);
 			}
 
 			LoadImages();
@@ -330,13 +341,10 @@ namespace RainbowAvatarBot {
 			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
 
 			bool isSticker = message.Type == MessageType.Sticker;
-			if (isSticker && message.Sticker.IsAnimated) {
-				await BotClient.SendTextMessageAsync(message.Chat.Id, "Animated stickers are not supported yet.", replyToMessageId: message.MessageId);
-				return;
-			}
 
 			bool isCached;
 			InputMedia resultImage;
+			Message processMessage = null;
 			// ReSharper disable once AssignmentInConditionalExpression
 			if (isCached = ResultCache.TryGetValue(imageUniqueID, overlayName, out string cachedResultImageID)) {
 				resultImage = cachedResultImageID;
@@ -351,22 +359,160 @@ namespace RainbowAvatarBot {
 					LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
 				}
 
+				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing);
 				resultImage = await ProcessImage(imageID, overlayName);
 			}
 
 			if (isSticker) {
-				Message resultMessage = await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false);
+				Message resultMessage = await BotClient.SendStickerAsync(message.Chat.Id, resultImage);
+				if (processMessage != null) {
+					#pragma warning disable 4014
+					BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
+					#pragma warning restore 4014
+				}
+
+				if (resultMessage.Sticker == null) {
+					await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
+					await BotClient.SendTextMessageAsync(message.Chat.Id, "UNABLE_TO_SEND");
+					return;
+				}
+
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Sticker.FileId);
 				}
 			} else {
 				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+				if (processMessage != null) {
+					#pragma warning disable 4014
+					BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
+					#pragma warning restore 4014
+				}
+
 				if (!isCached) {
 					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 				}
 			}
 		}
 
+		private static MemoryStream PackAnimatedSticker(string content) {
+			string tempFileName = Path.GetTempFileName();
+			File.WriteAllText(tempFileName, content);
+			Process szProcess = Process.Start("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=9");
+			// ReSharper disable once PossibleNullReferenceException
+			szProcess.WaitForExit();
+			MemoryStream packedMs = new MemoryStream(File.ReadAllBytes(tempFileName + ".gz"));
+			File.Delete(tempFileName);
+			File.Delete(tempFileName + ".gz");
+			return packedMs;
+		}
+		
+		private static string UnpackAnimatedSticker(byte[] content) {
+			using MemoryStream ms = new MemoryStream(content);
+			using MemoryStream unpackedMs = new MemoryStream();
+			using GZipStream gzStream = new GZipStream(ms, CompressionMode.Decompress);
+			gzStream.CopyTo(unpackedMs);
+			return Encoding.UTF8.GetString(unpackedMs.ToArray());
+		}
+
+		private static string ProcessLottieAnimation(string jsonText, string overlayName) {
+			JObject tokenizedSticker = JObject.Parse(jsonText);
+			JArray layersToken = (JArray) tokenizedSticker["layers"];
+			JArray assetsToken = (JArray) tokenizedSticker["assets"];
+
+			uint[] rgbValues = Flags[overlayName];
+
+			// Packing main animation to asset
+			JObject assetToken = new JObject {
+				["id"] = "_",
+				["layers"] = layersToken.DeepClone()
+			};
+
+			// Getting last frame
+			ushort lastFrame = tokenizedSticker["op"].Value<ushort>();
+
+			layersToken.RemoveAll();
+			assetsToken.Add(assetToken);
+			
+			// Adding text overlay
+			JObject textOverlayObject = (JObject) TextOverlay.DeepClone();
+			textOverlayObject["op"] = lastFrame;
+			layersToken.Add(textOverlayObject);
+
+			// Layer that reference main animation from assets
+			JObject referenceLayerObject = new JObject {["ind"] = 2, ["ty"] = 0, ["refId"] = "_", ["sr"] = 1, ["ks"] = new JObject {["o"] = new JObject {["a"] = 0, ["k"] = 100},
+				["r"] = new JObject {["a"] = 0, ["k"] = 0}, ["p"] = new JObject {["k"] = new JArray(256, 256, 0)}, ["a"] = new JObject {["k"] = new JArray(256, 256, 0)}},
+				["w"] = 512, ["h"] = 512, ["op"] = lastFrame
+			};
+
+			layersToken.Add(referenceLayerObject);
+
+			// Overlaying gradient
+			JObject gradientOverlayObject = (JObject) GradientOverlay.DeepClone();
+			gradientOverlayObject["op"] = lastFrame;
+			JObject gFillObject = (JObject) gradientOverlayObject["shapes"][0]["it"][2]["g"];
+			gFillObject["p"] = rgbValues.Length * 2 - 2;
+
+			float[] gradientProps = new float[(rgbValues.Length * 2 - 2) * 4];
+			byte index = 0;
+			foreach (uint rgbValue in rgbValues) {
+				void FillLine(byte startIndex, byte indexInc) {
+					gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Length, 3);
+					gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
+					gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
+					gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
+				}
+
+				if (index > 0) {
+					FillLine((byte) ((index * 2 - 1) * 4), 0);
+				}
+				
+				if (index < rgbValues.Length - 1) {
+					FillLine((byte) (index * 2 * 4), 1);
+				}
+
+				index++;
+			}
+
+			gFillObject["k"]["k"] = new JArray(gradientProps);
+			layersToken.Add(gradientOverlayObject);
+
+			JToken clonedReferenceObject = referenceLayerObject.DeepClone();
+			clonedReferenceObject["ind"] = 4;
+			layersToken.Add(clonedReferenceObject);
+
+			string[] jsonPaths = {"$..nm", "$..mn", "$..ix"};
+			foreach (string jsonPath in jsonPaths) {
+				foreach (JToken token in tokenizedSticker.SelectTokens(jsonPath).ToList()) {
+					token.Parent.Remove();
+				}
+			}
+			
+			string resultJson = tokenizedSticker.ToString(Formatting.None);
+
+			Regex numberRegex = new Regex(@"\d+\.\d{4,}", RegexOptions.Compiled);
+			resultJson = numberRegex.Replace(resultJson, match => Math.Round(float.Parse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture), 3).ToString(CultureInfo.InvariantCulture));
+
+			StringBuilder resultBuilder = new StringBuilder(resultJson);
+
+			resultBuilder
+			   .Replace(",\"bm\":0", "")
+			   .Replace("\"a\":0,", "")
+			   .Replace(",\"hd\":false", "")
+			   .Replace(",\"c\":false", "")
+			   .Replace(",\"ao\":0", "")
+			   .Replace(",\"ip\":0", "")
+			   .Replace(",\"st\":0", "")
+			   .Replace(",\"r\":{\"k\":0}", "")
+			   .Replace(",\"w\":{\"k\":0}", "")
+			   .Replace(",\"sk\":{\"k\":0}", "")
+			   .Replace(",\"sa\":{\"k\":0}", "")
+			   .Replace(",\"a\":{\"k\":\\[0,0,0\\]}", "")
+			   .Replace(",\"s\":{\"k\":\\[100,100,100\\]}", "")
+			   .Replace(",\"a\":{\"k\":\\[0,0\\]}", "");
+
+			return resultBuilder.ToString();
+		}
+		
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
 			Stopwatch sw = Stopwatch.StartNew();
 			byte[] file = await DownloadFile(fileId);
@@ -374,8 +520,25 @@ namespace RainbowAvatarBot {
 			sw.Stop();
 			Log("Downloading: " + sw.ElapsedMilliseconds + "ms");
 			sw.Restart();
-			Image image;
 
+			// GZip check, checking for magic number + compression method (DEFLATE)
+			bool isGZip = file[..3].SequenceEqual(new byte[] {0x1f, 0x8b, 0x08});
+			if (isGZip) {
+				sw.Stop();
+				string jsonSticker = UnpackAnimatedSticker(file);
+				Log("Creating: " + sw.ElapsedMilliseconds + "ms");
+				sw.Restart();
+				string processedAnimation = ProcessLottieAnimation(jsonSticker, overlayName);
+				sw.Stop();
+				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
+				sw.Restart();
+				InputMedia inputMediaAnimated = new InputMedia(PackAnimatedSticker(processedAnimation), "sticker.tgs");
+				sw.Stop();
+				Log("Saving: " + sw.ElapsedMilliseconds + "ms");
+				return inputMediaAnimated;
+			}
+
+			Image image;
 			// WebP check, checking if header contains `RIFF` and `WEBP`
 			bool isWebp = file[..4].SequenceEqual(new byte[] {82, 73, 70, 70}) && file[8..12].SequenceEqual(new byte[] {87, 69, 66, 80});
 

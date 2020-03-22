@@ -6,3 +6,6 @@ gen
 [Oo]bj/
 config.json
 *.txt
+*.suo
+*.dll
+*.exe
