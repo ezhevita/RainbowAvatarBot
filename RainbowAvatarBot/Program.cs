@@ -401,9 +401,15 @@ namespace RainbowAvatarBot {
 		private static MemoryStream PackAnimatedSticker(string content) {
 			string tempFileName = Path.GetTempFileName();
 			File.WriteAllText(tempFileName, content);
-			Process szProcess = Process.Start("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=9");
+			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=9") {
+				RedirectStandardOutput = true,
+				UseShellExecute = false
+			};
+
+			Process szProcess = Process.Start(processStartInfo);
 			// ReSharper disable once PossibleNullReferenceException
 			szProcess.WaitForExit();
+
 			MemoryStream packedMs = new MemoryStream(File.ReadAllBytes(tempFileName + ".gz"));
 			File.Delete(tempFileName);
 			File.Delete(tempFileName + ".gz");
