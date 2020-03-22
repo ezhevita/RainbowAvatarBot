@@ -43,7 +43,6 @@ namespace RainbowAvatarBot {
 		private static TelegramBotClient BotClient;
 		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
 		private static JObject GradientOverlay;
-		private static JObject TextOverlay;
 		private static Dictionary<string, uint[]> Flags;
 
 		private static async void BotOnCallbackQuery(object sender, CallbackQueryEventArgs e) {
@@ -130,7 +129,11 @@ namespace RainbowAvatarBot {
 
 			try {
 				if (e.Message.Type == MessageType.Text) {
-					Log(senderID + "|" + nameof(MessageType.Text) + "|" + e.Message.Text);
+					// ReSharper disable once PossibleNullReferenceException
+					if ((e.Message.Chat.Type == ChatType.Private) || e.Message.Text.StartsWith('/')) {
+						Log(senderID + "|" + e.Message.Type + "|" + e.Message.Text);
+					}
+
 					string command = args[0].ToUpperInvariant();
 					switch (command) {
 						case "OFF" when senderID == AdminID: {
@@ -199,7 +202,10 @@ namespace RainbowAvatarBot {
 						}
 
 						default: {
-							await BotClient.SendTextMessageAsync(chatID, Localization.StartMessage, replyToMessageId: e.Message.MessageId, parseMode: ParseMode.MarkdownV2);
+							if (e.Message.Chat.Type == ChatType.Private) {
+								await BotClient.SendTextMessageAsync(chatID, Localization.StartMessage, replyToMessageId: e.Message.MessageId, parseMode: ParseMode.MarkdownV2);
+							}
+
 							break;
 						}
 					}
@@ -308,7 +314,6 @@ namespace RainbowAvatarBot {
 			}
 
 			GradientOverlay = JObject.Parse(await File.ReadAllTextAsync("gradientOverlay.json"));
-			TextOverlay = JObject.Parse(await File.ReadAllTextAsync("textOverlay.json"));
 
 			if (!Directory.Exists("images")) {
 				Directory.CreateDirectory("images");
@@ -338,7 +343,7 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task ProcessAndSend(string imageID, string imageUniqueID, string overlayName, Message message) {
-			Log(message.From.Id + "|" + nameof(MessageType.Photo) + "|" + imageID);
+			Log(message.From.Id + "|" + message.Type + "|" + imageID);
 
 			bool isSticker = message.Type == MessageType.Sticker;
 
@@ -373,7 +378,7 @@ namespace RainbowAvatarBot {
 
 				if (resultMessage.Sticker == null) {
 					await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
-					await BotClient.SendTextMessageAsync(message.Chat.Id, "UNABLE_TO_SEND");
+					await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend);
 					return;
 				}
 
@@ -433,13 +438,8 @@ namespace RainbowAvatarBot {
 			layersToken.RemoveAll();
 			assetsToken.Add(assetToken);
 			
-			// Adding text overlay
-			JObject textOverlayObject = (JObject) TextOverlay.DeepClone();
-			textOverlayObject["op"] = lastFrame;
-			layersToken.Add(textOverlayObject);
-
 			// Layer that reference main animation from assets
-			JObject referenceLayerObject = new JObject {["ind"] = 2, ["ty"] = 0, ["refId"] = "_", ["sr"] = 1, ["ks"] = new JObject {["o"] = new JObject {["a"] = 0, ["k"] = 100},
+			JObject referenceLayerObject = new JObject {["ind"] = 1, ["ty"] = 0, ["refId"] = "_", ["sr"] = 1, ["ks"] = new JObject {["o"] = new JObject {["a"] = 0, ["k"] = 100},
 				["r"] = new JObject {["a"] = 0, ["k"] = 0}, ["p"] = new JObject {["k"] = new JArray(256, 256, 0)}, ["a"] = new JObject {["k"] = new JArray(256, 256, 0)}},
 				["w"] = 512, ["h"] = 512, ["op"] = lastFrame
 			};
@@ -477,7 +477,7 @@ namespace RainbowAvatarBot {
 			layersToken.Add(gradientOverlayObject);
 
 			JToken clonedReferenceObject = referenceLayerObject.DeepClone();
-			clonedReferenceObject["ind"] = 4;
+			clonedReferenceObject["ind"] = 3;
 			layersToken.Add(clonedReferenceObject);
 
 			string[] jsonPaths = {"$..nm", "$..mn", "$..ix"};
@@ -493,22 +493,6 @@ namespace RainbowAvatarBot {
 			resultJson = numberRegex.Replace(resultJson, match => Math.Round(float.Parse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture), 3).ToString(CultureInfo.InvariantCulture));
 
 			StringBuilder resultBuilder = new StringBuilder(resultJson);
-
-			resultBuilder
-			   .Replace(",\"bm\":0", "")
-			   .Replace("\"a\":0,", "")
-			   .Replace(",\"hd\":false", "")
-			   .Replace(",\"c\":false", "")
-			   .Replace(",\"ao\":0", "")
-			   .Replace(",\"ip\":0", "")
-			   .Replace(",\"st\":0", "")
-			   .Replace(",\"r\":{\"k\":0}", "")
-			   .Replace(",\"w\":{\"k\":0}", "")
-			   .Replace(",\"sk\":{\"k\":0}", "")
-			   .Replace(",\"sa\":{\"k\":0}", "")
-			   .Replace(",\"a\":{\"k\":\\[0,0,0\\]}", "")
-			   .Replace(",\"s\":{\"k\":\\[100,100,100\\]}", "")
-			   .Replace(",\"a\":{\"k\":\\[0,0\\]}", "");
 
 			return resultBuilder.ToString();
 		}
