@@ -142,6 +142,15 @@ namespace RainbowAvatarBot {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Lesbian.
+        /// </summary>
+        public static string Lesbian {
+            get {
+                return ResourceManager.GetString("Lesbian", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to LGBT.
         /// </summary>
         public static string LGBT {

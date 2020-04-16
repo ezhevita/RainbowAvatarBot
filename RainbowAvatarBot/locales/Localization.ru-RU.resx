@@ -181,6 +181,9 @@ _Разработчик бота \- @Vital\_7, готов всегда высл�
   <data name="Genderqueer" xml:space="preserve">
     <value>Гендерквиры</value>
   </data>
+  <data name="Lesbian" xml:space="preserve">
+    <value>Лесбиянки</value>
+  </data>
   <data name="LGBT" xml:space="preserve">
     <value>ЛГБТ</value>
   </data>
