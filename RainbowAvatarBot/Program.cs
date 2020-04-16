@@ -108,11 +108,8 @@ namespace RainbowAvatarBot {
 
 			string[] args = {""};
 			string textMessage = e.Message.Text ?? e.Message.Caption;
-			if (!string.IsNullOrEmpty(textMessage)) {
-				if (string.IsNullOrEmpty(textMessage)) {
-					return;
-				}
 
+			if (!string.IsNullOrEmpty(textMessage) && (textMessage[0] == '/')) {
 				string argumentToProcess = textMessage.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 				if (argumentToProcess.Contains('@')) {
 					if (argumentToProcess.Substring(argumentToProcess.IndexOf('@') + 1) != nameof(RainbowAvatarBot)) {
@@ -124,15 +121,13 @@ namespace RainbowAvatarBot {
 
 				args = argumentToProcess.Split('_', ',');
 				args[0] = args[0].Substring(1);
+			} else if (e.Message.Chat.Type != ChatType.Private) {
+				return;
 			}
 
 			try {
+				Log(senderID + "|" + e.Message.Type + "|" + textMessage);
 				if (e.Message.Type == MessageType.Text) {
-					// ReSharper disable once PossibleNullReferenceException
-					if ((e.Message.Chat.Type == ChatType.Private) || e.Message.Text.StartsWith('/')) {
-						Log(senderID + "|" + e.Message.Type + "|" + e.Message.Text);
-					}
-
 					string command = args[0].ToUpperInvariant();
 					switch (command) {
 						case "OFF" when senderID == AdminID: {
@@ -445,7 +440,7 @@ namespace RainbowAvatarBot {
 			
 			// Layer that reference main animation from assets
 			JObject referenceLayerObject = new JObject {["ind"] = 1, ["ty"] = 0, ["refId"] = "_", ["sr"] = 1, ["ks"] = new JObject {["o"] = new JObject {["a"] = 0, ["k"] = 100},
-				["r"] = new JObject {["a"] = 0, ["k"] = 0}, ["p"] = new JObject {["k"] = new JArray(256, 256, 0)}, ["a"] = new JObject {["k"] = new JArray(256, 256, 0)}},
+					["r"] = new JObject {["a"] = 0, ["k"] = 0}, ["p"] = new JObject {["k"] = new JArray(256, 256, 0)}, ["a"] = new JObject {["k"] = new JArray(256, 256, 0)}},
 				["w"] = 512, ["h"] = 512, ["op"] = lastFrame
 			};
 
