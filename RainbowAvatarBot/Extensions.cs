@@ -101,7 +101,7 @@ namespace RainbowAvatarBot {
 		internal static MemoryStream SaveToWebp(this Image image) {
 			MemoryStream stream = new MemoryStream();
 			SimpleEncoder encoder = new SimpleEncoder();
-			encoder.Encode((Bitmap) image, stream, 1);
+			encoder.Encode((Bitmap) image, stream, -1);
 			stream.Position = 0;
 			return stream;
 		}
