@@ -396,7 +396,7 @@ namespace RainbowAvatarBot {
 		private static MemoryStream PackAnimatedSticker(string content) {
 			string tempFileName = Path.GetTempFileName();
 			File.WriteAllText(tempFileName, content);
-			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=9") {
+			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=7") {
 				RedirectStandardOutput = true,
 				UseShellExecute = false
 			};

@@ -25,10 +25,11 @@ namespace RainbowAvatarBot {
 			Bitmap overlayBitmap = (Bitmap) overlayImage;
 			Bitmap newOverlayBitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height);
 
+			bool supportTransparency = Equals(sourceImage.RawFormat, ImageFormat.Png);
 			Rectangle rect = new Rectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height);
-			BitmapData sourceData = sourceBitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-			BitmapData newOverlayData = newOverlayBitmap.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+			BitmapData sourceData = sourceBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
+			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
+			BitmapData newOverlayData = newOverlayBitmap.LockBits(rect, ImageLockMode.WriteOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 
 			int sourceBytes = Math.Abs(sourceData.Stride) * sourceData.Height;
 			byte[] sourceValues = new byte[sourceBytes];
@@ -40,24 +41,30 @@ namespace RainbowAvatarBot {
 			Marshal.Copy(sourceData.Scan0, sourceValues, 0, sourceBytes);
 			Marshal.Copy(overlayData.Scan0, overlayValues, 0, overlayBytes);
 			Marshal.Copy(newOverlayData.Scan0, newOverlayValues, 0, newOverlayBytes);
-			// R channel
-			for (int i = 0; i < newOverlayValues.Length; i += 4) {
-				newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-			}
+			if (supportTransparency) {
+				// R channel
+				for (int i = 0; i < newOverlayValues.Length; i += 4) {
+					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
+				}
 
-			// G channel
-			for (int i = 1; i < newOverlayValues.Length; i += 4) {
-				newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-			}
+				// G channel
+				for (int i = 1; i < newOverlayValues.Length; i += 4) {
+					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
+				}
 
-			// B channel
-			for (int i = 2; i < newOverlayValues.Length; i += 4) {
-				newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-			}
+				// B channel
+				for (int i = 2; i < newOverlayValues.Length; i += 4) {
+					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
+				}
 
-			// A channel
-			for (int i = 3; i < newOverlayValues.Length; i += 4) {
-				newOverlayValues[i] = sourceValues[i];
+				// A channel
+				for (int i = 3; i < newOverlayValues.Length; i += 4) {
+					newOverlayValues[i] = sourceValues[i];
+				}
+			} else {
+				for (int i = 0; i < newOverlayValues.Length; i++) {
+					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
+				}
 			}
 
 			Marshal.Copy(newOverlayValues, 0, newOverlayData.Scan0, newOverlayBytes);
