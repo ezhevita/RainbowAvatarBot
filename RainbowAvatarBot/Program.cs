@@ -9,7 +9,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Imazen.WebP;
@@ -43,6 +42,7 @@ namespace RainbowAvatarBot {
 		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
 		private static JObject GradientOverlay;
 		private static Dictionary<string, uint[]> Flags;
+		private static Dictionary<string, float[]> FlagGradients;
 
 		private static async void BotOnCallbackQuery(object sender, CallbackQueryEventArgs e) {
 			if (e?.CallbackQuery == null) {
@@ -300,7 +300,7 @@ namespace RainbowAvatarBot {
 			}
 
 			Log("Starting " + nameof(RainbowAvatarBot));
-			string token = File.ReadAllText("token.txt");
+			string token = await File.ReadAllTextAsync("token.txt");
 			BotClient = new TelegramBotClient(token);
 			if (!await BotClient.TestApiAsync()) {
 				Log("Error when starting bot!");
@@ -313,7 +313,7 @@ namespace RainbowAvatarBot {
 				Directory.CreateDirectory("images");
 			}
 
-			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(File.ReadAllText("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
+			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(await File.ReadAllTextAsync("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
 			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
 			if (Flags.Keys.Any(name => !existFiles.Contains(name))) {
 				GenerateImages(Flags);
@@ -321,14 +321,19 @@ namespace RainbowAvatarBot {
 
 			LoadImages();
 
+			FlagGradients = new Dictionary<string, float[]>(Flags.Count);
+			foreach ((string flagName, uint[] rgbValues) in Flags) {
+				FlagGradients[flagName] = GenerateGradient(rgbValues);
+			}
+
 			BotClient.OnMessage += BotOnMessage;
 			BotClient.OnCallbackQuery += BotOnCallbackQuery;
 			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
 
 			Log("Started!");
 			await ShutdownSemaphore.WaitAsync();
-			ClearUsersTimer.Dispose();
-			ResetTimer.Dispose();
+			await ClearUsersTimer.DisposeAsync();
+			await ResetTimer.DisposeAsync();
 			foreach ((_, Image image) in Images) {
 				image.Dispose();
 			}
@@ -393,30 +398,29 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static MemoryStream PackAnimatedSticker(string content) {
+		private static async Task<Stream> PackAnimatedSticker(string content) {
 			string tempFileName = Path.GetTempFileName();
-			File.WriteAllText(tempFileName, content);
-			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=7") {
+			await File.WriteAllTextAsync(tempFileName, content);
+			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
 				RedirectStandardOutput = true,
 				UseShellExecute = false
 			};
 
 			Process szProcess = Process.Start(processStartInfo);
-			// ReSharper disable once PossibleNullReferenceException
-			szProcess.WaitForExit();
+			await szProcess.WaitForExitAsync();
 
-			MemoryStream packedMs = new MemoryStream(File.ReadAllBytes(tempFileName + ".gz"));
+			FileStream packedMs = new FileStream(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
 			File.Delete(tempFileName);
-			File.Delete(tempFileName + ".gz");
+
 			return packedMs;
 		}
 		
 		private static string UnpackAnimatedSticker(byte[] content) {
 			using MemoryStream ms = new MemoryStream(content);
-			using MemoryStream unpackedMs = new MemoryStream();
 			using GZipStream gzStream = new GZipStream(ms, CompressionMode.Decompress);
-			gzStream.CopyTo(unpackedMs);
-			return Encoding.UTF8.GetString(unpackedMs.ToArray());
+			
+			using StreamReader reader = new StreamReader(gzStream);
+			return reader.ReadToEnd();
 		}
 
 		private static string ProcessLottieAnimation(string jsonText, string overlayName) {
@@ -424,12 +428,12 @@ namespace RainbowAvatarBot {
 			JArray layersToken = (JArray) tokenizedSticker["layers"];
 			JArray assetsToken = (JArray) tokenizedSticker["assets"];
 
-			uint[] rgbValues = Flags[overlayName];
+			int rgbValuesLength = Flags[overlayName].Length;
 
 			// Packing main animation to asset
 			JObject assetToken = new JObject {
 				["id"] = "_",
-				["layers"] = layersToken.DeepClone()
+				["layers"] = layersToken
 			};
 
 			// Getting last frame
@@ -450,28 +454,9 @@ namespace RainbowAvatarBot {
 			JObject gradientOverlayObject = (JObject) GradientOverlay.DeepClone();
 			gradientOverlayObject["op"] = lastFrame;
 			JObject gFillObject = (JObject) gradientOverlayObject["shapes"][0]["it"][2]["g"];
-			gFillObject["p"] = rgbValues.Length * 2 - 2;
+			gFillObject["p"] = rgbValuesLength * 2 - 2;
 
-			float[] gradientProps = new float[(rgbValues.Length * 2 - 2) * 4];
-			byte index = 0;
-			foreach (uint rgbValue in rgbValues) {
-				void FillLine(byte startIndex, byte indexInc) {
-					gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Length, 3);
-					gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
-					gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
-					gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
-				}
-
-				if (index > 0) {
-					FillLine((byte) ((index * 2 - 1) * 4), 0);
-				}
-				
-				if (index < rgbValues.Length - 1) {
-					FillLine((byte) (index * 2 * 4), 1);
-				}
-
-				index++;
-			}
+			float[] gradientProps = FlagGradients[overlayName];
 
 			gFillObject["k"]["k"] = new JArray(gradientProps);
 			layersToken.Add(gradientOverlayObject);
@@ -480,10 +465,34 @@ namespace RainbowAvatarBot {
 			clonedReferenceObject["ind"] = 3;
 			layersToken.Add(clonedReferenceObject);
 
-			string resultJson = tokenizedSticker.ToString(Formatting.None);
-			return resultJson;
+			return tokenizedSticker.ToString(Formatting.None);
 		}
-		
+
+		private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues) {
+			float[] gradientProps = new float[(rgbValues.Count * 2 - 2) * 4];
+			byte index = 0;
+			foreach (uint rgbValue in rgbValues) {
+				void FillLine(byte startIndex, byte indexInc) {
+					gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Count, 3);
+					gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
+					gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
+					gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
+				}
+
+				if (index > 0) {
+					FillLine((byte) ((index * 2 - 1) * 4), 0);
+				}
+
+				if (index < rgbValues.Count - 1) {
+					FillLine((byte) (index * 2 * 4), 1);
+				}
+
+				index++;
+			}
+
+			return gradientProps;
+		}
+
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
 			Stopwatch sw = Stopwatch.StartNew();
 			byte[] file = await DownloadFile(fileId);
@@ -503,7 +512,7 @@ namespace RainbowAvatarBot {
 				sw.Stop();
 				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
-				InputMedia inputMediaAnimated = new InputMedia(PackAnimatedSticker(processedAnimation), "sticker.tgs");
+				InputMedia inputMediaAnimated = new InputMedia(await PackAnimatedSticker(processedAnimation), "sticker.tgs");
 				sw.Stop();
 				Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 				return inputMediaAnimated;

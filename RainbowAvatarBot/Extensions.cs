@@ -1,10 +1,13 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Imazen.WebP;
 
 namespace RainbowAvatarBot {
@@ -25,7 +28,7 @@ namespace RainbowAvatarBot {
 			Bitmap overlayBitmap = (Bitmap) overlayImage;
 			Bitmap newOverlayBitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height);
 
-			bool supportTransparency = Equals(sourceImage.RawFormat, ImageFormat.Png);
+			bool supportTransparency = Equals(sourceImage.RawFormat, ImageFormat.Png) || Equals(sourceImage.RawFormat, ImageFormat.MemoryBmp);
 			Rectangle rect = new Rectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height);
 			BitmapData sourceData = sourceBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
@@ -108,7 +111,7 @@ namespace RainbowAvatarBot {
 		internal static MemoryStream SaveToWebp(this Image image) {
 			MemoryStream stream = new MemoryStream();
 			SimpleEncoder encoder = new SimpleEncoder();
-			encoder.Encode((Bitmap) image, stream, -1);
+			encoder.Encode((Bitmap) image, stream, 95);
 			stream.Position = 0;
 			return stream;
 		}
@@ -128,6 +131,22 @@ namespace RainbowAvatarBot {
 			gfx.DrawImage(image, new Rectangle(0, 0, image.Width, image.Height), 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, imageAttributes);
 
 			return output;
+		}
+		
+		public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default) {
+			if (process.HasExited) {
+				return Task.CompletedTask;
+			}
+
+			TaskCompletionSource<object> tcs = new TaskCompletionSource<object>();
+			process.EnableRaisingEvents = true;
+			process.Exited += (sender, args) => tcs.TrySetResult(null);
+
+			if (cancellationToken != default) {
+				cancellationToken.Register(() => tcs.SetCanceled());
+			}
+
+			return process.HasExited ? Task.CompletedTask : tcs.Task;
 		}
 	}
 }
