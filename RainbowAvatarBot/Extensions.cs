@@ -45,29 +45,13 @@ namespace RainbowAvatarBot {
 			Marshal.Copy(overlayData.Scan0, overlayValues, 0, overlayBytes);
 			Marshal.Copy(newOverlayData.Scan0, newOverlayValues, 0, newOverlayBytes);
 			if (supportTransparency) {
-				// R channel
-				for (int i = 0; i < newOverlayValues.Length; i += 4) {
-					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-				}
+				Parallel.For(0, newOverlayValues.Length / 4 * 3, j => {
+					newOverlayValues[j + j / 3] = ProcessHardLight(sourceValues[j + j / 3], overlayValues[j + j / 3]);
+				});
 
-				// G channel
-				for (int i = 1; i < newOverlayValues.Length; i += 4) {
-					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-				}
-
-				// B channel
-				for (int i = 2; i < newOverlayValues.Length; i += 4) {
-					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-				}
-
-				// A channel
-				for (int i = 3; i < newOverlayValues.Length; i += 4) {
-					newOverlayValues[i] = sourceValues[i];
-				}
+				Parallel.For(0, newOverlayValues.Length / 4, i => newOverlayValues[i * 4 + 3] = sourceValues[i * 4 + 3]);
 			} else {
-				for (int i = 0; i < newOverlayValues.Length; i++) {
-					newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]);
-				}
+				Parallel.For(0, newOverlayValues.Length, i => newOverlayValues[i] = ProcessHardLight(sourceValues[i], overlayValues[i]));
 			}
 
 			Marshal.Copy(newOverlayValues, 0, newOverlayData.Scan0, newOverlayBytes);
@@ -120,11 +104,13 @@ namespace RainbowAvatarBot {
 			ColorMatrix colorMatrix = new ColorMatrix {
 				Matrix33 = opacity
 			};
+
 			ImageAttributes imageAttributes = new ImageAttributes();
 			imageAttributes.SetColorMatrix(
 				colorMatrix,
 				ColorMatrixFlag.Default,
 				ColorAdjustType.Bitmap);
+
 			Bitmap output = new Bitmap(image.Width, image.Height);
 			using Graphics gfx = Graphics.FromImage(output);
 			gfx.SmoothingMode = SmoothingMode.AntiAlias;
