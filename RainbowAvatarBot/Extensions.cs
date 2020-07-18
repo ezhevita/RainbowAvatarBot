@@ -34,31 +34,21 @@ namespace RainbowAvatarBot {
 			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 			BitmapData newOverlayData = newOverlayBitmap.LockBits(rect, ImageLockMode.WriteOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 
-			/*int sourceBytes = Math.Abs(sourceData.Stride) * sourceData.Height;
-			byte[] sourceValues = new byte[sourceBytes];
-			int overlayBytes = Math.Abs(overlayData.Stride) * overlayBitmap.Height;
-			byte[] overlayValues = new byte[overlayBytes];
-			int newOverlayBytes = Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height;
-			byte[] newOverlayValues = new byte[newOverlayBytes];
-
-			Marshal.Copy(sourceData.Scan0, sourceValues, 0, sourceBytes);
-			Marshal.Copy(overlayData.Scan0, overlayVgialues, 0, overlayBytes);
-			Marshal.Copy(newOverlayData.Scan0, newOverlayValues, 0, newOverlayBytes);*/
 			byte* sourcePointer = (byte*) sourceData.Scan0.ToPointer();
 			byte* overlayPointer = (byte*) overlayData.Scan0.ToPointer();
 			byte* newOverlayPointer = (byte*) newOverlayData.Scan0.ToPointer();
-			
+
+			int overlayLength = Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height;
 			if (supportTransparency) {
-				Parallel.For(0, Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height / 4 * 3, j => {
-					newOverlayPointer[j + j / 3] = ProcessHardLight(sourcePointer[j + j / 3], overlayPointer[j + j / 3]);
+				Parallel.For(0, overlayLength / 4 * 3, i => {
+					newOverlayPointer[i + i / 3] = ProcessHardLight(sourcePointer[i + i / 3], overlayPointer[i + i / 3]);
 				});
 
-				Parallel.For(0, Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height / 4, i => newOverlayPointer[i * 4 + 3] = sourcePointer[i * 4 + 3]);
+				Parallel.For(0, overlayLength / 4, i => newOverlayPointer[i * 4 + 3] = sourcePointer[i * 4 + 3]);
 			} else {
-				Parallel.For(0, Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height, i => newOverlayPointer[i] = ProcessHardLight(sourcePointer[i], overlayPointer[i]));
+				Parallel.For(0, overlayLength, i => newOverlayPointer[i] = ProcessHardLight(sourcePointer[i], overlayPointer[i]));
 			}
 
-			//Marshal.Copy(newOverlayValues, 0, newOverlayData.Scan0, newOverlayBytes);
 			sourceBitmap.UnlockBits(sourceData);
 			overlayBitmap.UnlockBits(overlayData);
 			newOverlayBitmap.UnlockBits(newOverlayData);
