@@ -40,9 +40,7 @@ namespace RainbowAvatarBot {
 
 			int overlayLength = Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height;
 			if (supportTransparency) {
-				Parallel.For(0, overlayLength / 4 * 3, i => {
-					newOverlayPointer[i + i / 3] = ProcessHardLight(sourcePointer[i + i / 3], overlayPointer[i + i / 3]);
-				});
+				Parallel.For(0, overlayLength / 4 * 3, i => { newOverlayPointer[i + i / 3] = ProcessHardLight(sourcePointer[i + i / 3], overlayPointer[i + i / 3]); });
 
 				Parallel.For(0, overlayLength / 4, i => newOverlayPointer[i * 4 + 3] = sourcePointer[i * 4 + 3]);
 			} else {
@@ -112,7 +110,7 @@ namespace RainbowAvatarBot {
 
 			return output;
 		}
-		
+
 		public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default) {
 			if (process.HasExited) {
 				return Task.CompletedTask;

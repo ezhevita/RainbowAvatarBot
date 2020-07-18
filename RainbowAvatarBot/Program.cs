@@ -33,6 +33,7 @@ namespace RainbowAvatarBot {
 		private static readonly Timer ResetTimer = new Timer(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
 		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
+
 		private static readonly HashSet<MessageType> SupportedTypes = new HashSet<MessageType>(3) {
 			MessageType.Photo,
 			MessageType.Sticker
@@ -81,21 +82,6 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static void SetThreadLocale(string languageCode) {
-			switch (languageCode) {
-				case null:
-				case "":
-				case "ru":
-				case "uk":
-				case "be":
-					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag("ru-RU");
-					break;
-				default:
-					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag(languageCode);
-					break;
-			}
-		}
-		
 		private static async void BotOnMessage(object sender, MessageEventArgs e) {
 			if ((e?.Message == null) || (e.Message.Date < StartedTime)) {
 				return;
@@ -265,6 +251,31 @@ namespace RainbowAvatarBot {
 			return stream.ToArray();
 		}
 
+		private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues) {
+			float[] gradientProps = new float[(rgbValues.Count * 2 - 2) * 4];
+			byte index = 0;
+			foreach (uint rgbValue in rgbValues) {
+				void FillLine(byte startIndex, byte indexInc) {
+					gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Count, 3);
+					gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
+					gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
+					gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
+				}
+
+				if (index > 0) {
+					FillLine((byte) ((index * 2 - 1) * 4), 0);
+				}
+
+				if (index < rgbValues.Count - 1) {
+					FillLine((byte) (index * 2 * 4), 1);
+				}
+
+				index++;
+			}
+
+			return gradientProps;
+		}
+
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
 			foreach ((string name, uint[] rgbValues) in flags) {
 				using Bitmap image = new Bitmap(1, rgbValues.Length);
@@ -341,6 +352,23 @@ namespace RainbowAvatarBot {
 			BotClient.StopReceiving();
 		}
 
+		private static async Task<Stream> PackAnimatedSticker(string content) {
+			string tempFileName = Path.GetTempFileName();
+			await File.WriteAllTextAsync(tempFileName, content);
+			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
+				RedirectStandardOutput = true,
+				UseShellExecute = false
+			};
+
+			Process szProcess = Process.Start(processStartInfo);
+			await szProcess.WaitForExitAsync();
+
+			FileStream packedMs = new FileStream(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
+			File.Delete(tempFileName);
+
+			return packedMs;
+		}
+
 		private static async Task ProcessAndSend(string imageID, string imageUniqueID, string overlayName, Message message) {
 			Log(message.From.Id + "|" + message.Type + "|" + imageID);
 
@@ -398,101 +426,6 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<Stream> PackAnimatedSticker(string content) {
-			string tempFileName = Path.GetTempFileName();
-			await File.WriteAllTextAsync(tempFileName, content);
-			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
-				RedirectStandardOutput = true,
-				UseShellExecute = false
-			};
-
-			Process szProcess = Process.Start(processStartInfo);
-			await szProcess.WaitForExitAsync();
-
-			FileStream packedMs = new FileStream(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
-			File.Delete(tempFileName);
-
-			return packedMs;
-		}
-		
-		private static string UnpackAnimatedSticker(byte[] content) {
-			using MemoryStream ms = new MemoryStream(content);
-			using GZipStream gzStream = new GZipStream(ms, CompressionMode.Decompress);
-			
-			using StreamReader reader = new StreamReader(gzStream);
-			return reader.ReadToEnd();
-		}
-
-		private static string ProcessLottieAnimation(string jsonText, string overlayName) {
-			JObject tokenizedSticker = JObject.Parse(jsonText);
-			JArray layersToken = (JArray) tokenizedSticker["layers"];
-			JArray assetsToken = (JArray) tokenizedSticker["assets"];
-
-			int rgbValuesLength = Flags[overlayName].Length;
-
-			// Packing main animation to asset
-			JObject assetToken = new JObject {
-				["id"] = "_",
-				["layers"] = layersToken
-			};
-
-			// Getting last frame
-			ushort lastFrame = tokenizedSticker["op"].Value<ushort>();
-
-			layersToken.RemoveAll();
-			assetsToken.Add(assetToken);
-			
-			// Layer that reference main animation from assets
-			JObject referenceLayerObject = new JObject {["ind"] = 1, ["ty"] = 0, ["refId"] = "_", ["sr"] = 1, ["ks"] = new JObject {["o"] = new JObject {["a"] = 0, ["k"] = 100},
-					["r"] = new JObject {["a"] = 0, ["k"] = 0}, ["p"] = new JObject {["k"] = new JArray(256, 256, 0)}, ["a"] = new JObject {["k"] = new JArray(256, 256, 0)}},
-				["w"] = 512, ["h"] = 512, ["op"] = lastFrame
-			};
-
-			layersToken.Add(referenceLayerObject);
-
-			// Overlaying gradient
-			JObject gradientOverlayObject = (JObject) GradientOverlay.DeepClone();
-			gradientOverlayObject["op"] = lastFrame;
-			JObject gFillObject = (JObject) gradientOverlayObject["shapes"][0]["it"][2]["g"];
-			gFillObject["p"] = rgbValuesLength * 2 - 2;
-
-			float[] gradientProps = FlagGradients[overlayName];
-
-			gFillObject["k"]["k"] = new JArray(gradientProps);
-			layersToken.Add(gradientOverlayObject);
-
-			JToken clonedReferenceObject = referenceLayerObject.DeepClone();
-			clonedReferenceObject["ind"] = 3;
-			layersToken.Add(clonedReferenceObject);
-
-			return tokenizedSticker.ToString(Formatting.None);
-		}
-
-		private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues) {
-			float[] gradientProps = new float[(rgbValues.Count * 2 - 2) * 4];
-			byte index = 0;
-			foreach (uint rgbValue in rgbValues) {
-				void FillLine(byte startIndex, byte indexInc) {
-					gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Count, 3);
-					gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
-					gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
-					gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
-				}
-
-				if (index > 0) {
-					FillLine((byte) ((index * 2 - 1) * 4), 0);
-				}
-
-				if (index < rgbValues.Count - 1) {
-					FillLine((byte) (index * 2 * 4), 1);
-				}
-
-				index++;
-			}
-
-			return gradientProps;
-		}
-
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
 			Stopwatch sw = Stopwatch.StartNew();
 			byte[] file = await DownloadFile(fileId);
@@ -536,13 +469,102 @@ namespace RainbowAvatarBot {
 			image.Overlay(Images[overlayName]);
 			sw.Stop();
 			Log("Processing: " + sw.ElapsedMilliseconds + "ms");
-			
+
 			sw.Restart();
 
 			InputMedia inputMedia = isWebp ? new InputMedia(image.SaveToWebp(), "sticker.webp") : new InputMedia(image.SaveToPng(), "image.png");
 			sw.Stop();
 			Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 			return inputMedia;
+		}
+
+		private static string ProcessLottieAnimation(string jsonText, string overlayName) {
+			JObject tokenizedSticker = JObject.Parse(jsonText);
+			JArray layersToken = (JArray) tokenizedSticker["layers"];
+			JArray assetsToken = (JArray) tokenizedSticker["assets"];
+
+			int rgbValuesLength = Flags[overlayName].Length;
+
+			// Packing main animation to asset
+			JObject assetToken = new JObject {
+				["id"] = "_",
+				["layers"] = layersToken
+			};
+
+			// Getting last frame
+			ushort lastFrame = tokenizedSticker["op"].Value<ushort>();
+
+			layersToken.RemoveAll();
+			assetsToken.Add(assetToken);
+
+			// Layer that reference main animation from assets
+			JObject referenceLayerObject = new JObject {
+				["ind"] = 1,
+				["ty"] = 0,
+				["refId"] = "_",
+				["sr"] = 1,
+				["ks"] = new JObject {
+					["o"] = new JObject {
+						["a"] = 0,
+						["k"] = 100
+					},
+					["r"] = new JObject {
+						["a"] = 0,
+						["k"] = 0
+					},
+					["p"] = new JObject {
+						["k"] = new JArray(256, 256, 0)
+					},
+					["a"] = new JObject {
+						["k"] = new JArray(256, 256, 0)
+					}
+				},
+				["w"] = 512,
+				["h"] = 512,
+				["op"] = lastFrame
+			};
+
+			layersToken.Add(referenceLayerObject);
+
+			// Overlaying gradient
+			JObject gradientOverlayObject = (JObject) GradientOverlay.DeepClone();
+			gradientOverlayObject["op"] = lastFrame;
+			JObject gFillObject = (JObject) gradientOverlayObject["shapes"][0]["it"][2]["g"];
+			gFillObject["p"] = rgbValuesLength * 2 - 2;
+
+			float[] gradientProps = FlagGradients[overlayName];
+
+			gFillObject["k"]["k"] = new JArray(gradientProps);
+			layersToken.Add(gradientOverlayObject);
+
+			JToken clonedReferenceObject = referenceLayerObject.DeepClone();
+			clonedReferenceObject["ind"] = 3;
+			layersToken.Add(clonedReferenceObject);
+
+			return tokenizedSticker.ToString(Formatting.None);
+		}
+
+		private static void SetThreadLocale(string languageCode) {
+			switch (languageCode) {
+				case null:
+				case "":
+				case "ru":
+				case "uk":
+				case "be":
+					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag("ru-RU");
+					break;
+				default:
+					Thread.CurrentThread.CurrentUICulture = CultureInfo.GetCultureInfoByIetfLanguageTag(languageCode);
+					break;
+			}
+		}
+
+		private static string UnpackAnimatedSticker(byte[] content) {
+			using MemoryStream ms = new MemoryStream(content);
+			using GZipStream gzStream = new GZipStream(ms, CompressionMode.Decompress);
+
+			using StreamReader reader = new StreamReader(gzStream);
+			return reader.ReadToEnd();
 		}
 	}
 }
