@@ -26,10 +26,10 @@ namespace RainbowAvatarBot {
 		private static unsafe void OverlayHardLight(this Image sourceImage, Image overlayImage) {
 			Bitmap sourceBitmap = (Bitmap) sourceImage;
 			Bitmap overlayBitmap = (Bitmap) overlayImage;
-			Bitmap newOverlayBitmap = new Bitmap(sourceBitmap.Width, sourceBitmap.Height);
+			Bitmap newOverlayBitmap = new(sourceBitmap.Width, sourceBitmap.Height);
 
 			bool supportTransparency = Equals(sourceImage.RawFormat, ImageFormat.Png) || Equals(sourceImage.RawFormat, ImageFormat.MemoryBmp);
-			Rectangle rect = new Rectangle(0, 0, sourceBitmap.Width, sourceBitmap.Height);
+			Rectangle rect = new(0, 0, sourceBitmap.Width, sourceBitmap.Height);
 			BitmapData sourceData = sourceBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
 			BitmapData newOverlayData = newOverlayBitmap.LockBits(rect, ImageLockMode.WriteOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
@@ -63,7 +63,7 @@ namespace RainbowAvatarBot {
 		private static byte ProcessHardLight(byte source, byte overlay) => (byte) (overlay < 128 ? 2 * source * overlay / 255 : 255 - 2 * (255 - source) * (255 - overlay) / 255);
 
 		private static Bitmap ResizeImage(Image image, int width, int height) {
-			Bitmap destImage = new Bitmap(width, height);
+			Bitmap destImage = new(width, height);
 
 			destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
 
@@ -78,32 +78,32 @@ namespace RainbowAvatarBot {
 		}
 
 		internal static MemoryStream SaveToPng(this Image image) {
-			MemoryStream stream = new MemoryStream();
+			MemoryStream stream = new();
 			image.Save(stream, ImageFormat.Png);
 			stream.Position = 0;
 			return stream;
 		}
 
 		internal static MemoryStream SaveToWebp(this Image image) {
-			MemoryStream stream = new MemoryStream();
-			SimpleEncoder encoder = new SimpleEncoder();
+			MemoryStream stream = new();
+			SimpleEncoder encoder = new();
 			encoder.Encode((Bitmap) image, stream, 95);
 			stream.Position = 0;
 			return stream;
 		}
 
 		private static Image SetOpacity(this Image image, float opacity) {
-			ColorMatrix colorMatrix = new ColorMatrix {
+			ColorMatrix colorMatrix = new() {
 				Matrix33 = opacity
 			};
 
-			ImageAttributes imageAttributes = new ImageAttributes();
+			ImageAttributes imageAttributes = new();
 			imageAttributes.SetColorMatrix(
 				colorMatrix,
 				ColorMatrixFlag.Default,
 				ColorAdjustType.Bitmap);
 
-			Bitmap output = new Bitmap(image.Width, image.Height);
+			Bitmap output = new(image.Width, image.Height);
 			using Graphics gfx = Graphics.FromImage(output);
 			gfx.SmoothingMode = SmoothingMode.AntiAlias;
 			gfx.DrawImage(image, new Rectangle(0, 0, image.Width, image.Height), 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, imageAttributes);
@@ -116,7 +116,7 @@ namespace RainbowAvatarBot {
 				return Task.CompletedTask;
 			}
 
-			TaskCompletionSource<object> tcs = new TaskCompletionSource<object>();
+			TaskCompletionSource<object> tcs = new();
 			process.EnableRaisingEvents = true;
 			process.Exited += (sender, args) => tcs.TrySetResult(null);
 

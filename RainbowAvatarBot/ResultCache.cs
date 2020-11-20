@@ -2,7 +2,7 @@
 
 namespace RainbowAvatarBot {
 	internal class ResultCache {
-		private readonly ConcurrentDictionary<(string fileID, string overlayName), string> Dictionary = new ConcurrentDictionary<(string fileID, string overlayName), string>();
+		private readonly ConcurrentDictionary<(string fileID, string overlayName), string> Dictionary = new();
 
 		public void Reset() {
 			Dictionary.Clear();

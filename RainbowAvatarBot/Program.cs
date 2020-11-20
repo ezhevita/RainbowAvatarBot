@@ -9,6 +9,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Imazen.WebP;
@@ -24,23 +25,23 @@ using File = System.IO.File;
 namespace RainbowAvatarBot {
 	internal static class Program {
 		private const int AdminID = 204723509;
-		private static readonly Dictionary<string, Image> Images = new Dictionary<string, Image>();
+		private static readonly Dictionary<string, Image> Images = new();
 
-		private static readonly ResultCache ResultCache = new ResultCache();
+		private static readonly ResultCache ResultCache = new();
 
-		private static readonly Timer ClearUsersTimer = new Timer(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new ConcurrentDictionary<int, DateTime>();
-		private static readonly Timer ResetTimer = new Timer(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
-		private static readonly SemaphoreSlim ShutdownSemaphore = new SemaphoreSlim(0, 1);
+		private static readonly Timer ClearUsersTimer = new(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new();
+		private static readonly Timer ResetTimer = new(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
+		private static readonly SemaphoreSlim ShutdownSemaphore = new(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
 
-		private static readonly HashSet<MessageType> SupportedTypes = new HashSet<MessageType>(3) {
+		private static readonly HashSet<MessageType> SupportedTypes = new(3) {
 			MessageType.Photo,
 			MessageType.Sticker
 		};
 
 		private static TelegramBotClient BotClient;
-		private static ConcurrentDictionary<int, string> UserSettings = new ConcurrentDictionary<int, string>();
+		private static ConcurrentDictionary<int, string> UserSettings = new();
 		private static JObject GradientOverlay;
 		private static Dictionary<string, uint[]> Flags;
 		private static Dictionary<string, float[]> FlagGradients;
@@ -245,7 +246,7 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task<byte[]> DownloadFile(string fileID) {
-			await using MemoryStream stream = new MemoryStream();
+			await using MemoryStream stream = new();
 			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
 			stream.Position = 0;
 			return stream.ToArray();
@@ -278,12 +279,12 @@ namespace RainbowAvatarBot {
 
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
 			foreach ((string name, uint[] rgbValues) in flags) {
-				using Bitmap image = new Bitmap(1, rgbValues.Length);
+				using Bitmap image = new(1, rgbValues.Length);
 				using Graphics graphics = Graphics.FromImage(image);
 
 				byte index = 0;
 				foreach (uint rgbValue in rgbValues) {
-					using SolidBrush brush = new SolidBrush(Color.FromArgb((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)));
+					using SolidBrush brush = new(Color.FromArgb((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)));
 					graphics.FillRectangle(brush, new RectangleF(0, index, 1, 1));
 					index++;
 				}
@@ -355,7 +356,7 @@ namespace RainbowAvatarBot {
 		private static async Task<Stream> PackAnimatedSticker(string content) {
 			string tempFileName = Path.GetTempFileName();
 			await File.WriteAllTextAsync(tempFileName, content);
-			ProcessStartInfo processStartInfo = new ProcessStartInfo("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
+			ProcessStartInfo processStartInfo = new("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
 				RedirectStandardOutput = true,
 				UseShellExecute = false
 			};
@@ -363,7 +364,7 @@ namespace RainbowAvatarBot {
 			Process szProcess = Process.Start(processStartInfo);
 			await szProcess.WaitForExitAsync();
 
-			FileStream packedMs = new FileStream(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
+			FileStream packedMs = new(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
 			File.Delete(tempFileName);
 
 			return packedMs;
@@ -426,6 +427,9 @@ namespace RainbowAvatarBot {
 			}
 		}
 
+		private static byte[] GZipBytes = {0x1f, 0x8b, 0x08};
+		private static byte[] RiffBytes = Encoding.UTF8.GetBytes("RIFF");
+		private static byte[] WebpBytes = Encoding.UTF8.GetBytes("WEBP");
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
 			Stopwatch sw = Stopwatch.StartNew();
 			byte[] file = await DownloadFile(fileId);
@@ -435,7 +439,7 @@ namespace RainbowAvatarBot {
 			sw.Restart();
 
 			// GZip check, checking for magic number + compression method (DEFLATE)
-			bool isGZip = file[..3].SequenceEqual(new byte[] {0x1f, 0x8b, 0x08});
+			bool isGZip = file[..3].SequenceEqual(GZipBytes);
 			if (isGZip) {
 				sw.Stop();
 				string jsonSticker = UnpackAnimatedSticker(file);
@@ -445,7 +449,7 @@ namespace RainbowAvatarBot {
 				sw.Stop();
 				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
-				InputMedia inputMediaAnimated = new InputMedia(await PackAnimatedSticker(processedAnimation), "sticker.tgs");
+				InputMedia inputMediaAnimated = new(await PackAnimatedSticker(processedAnimation), "sticker.tgs");
 				sw.Stop();
 				Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 				return inputMediaAnimated;
@@ -453,10 +457,10 @@ namespace RainbowAvatarBot {
 
 			Image image;
 			// WebP check, checking if header contains `RIFF` and `WEBP`
-			bool isWebp = file[..4].SequenceEqual(new byte[] {82, 73, 70, 70}) && file[8..12].SequenceEqual(new byte[] {87, 69, 66, 80});
+			bool isWebp = file[..4].SequenceEqual(RiffBytes) && file[8..12].SequenceEqual(WebpBytes);
 
 			if (isWebp) {
-				SimpleDecoder decoder = new SimpleDecoder();
+				SimpleDecoder decoder = new();
 				image = decoder.DecodeFromBytes(file, file.Length);
 			} else {
 				image = Image.FromStream(new MemoryStream(file));
@@ -486,7 +490,7 @@ namespace RainbowAvatarBot {
 			int rgbValuesLength = Flags[overlayName].Length;
 
 			// Packing main animation to asset
-			JObject assetToken = new JObject {
+			JObject assetToken = new() {
 				["id"] = "_",
 				["layers"] = layersToken
 			};
@@ -498,7 +502,7 @@ namespace RainbowAvatarBot {
 			assetsToken.Add(assetToken);
 
 			// Layer that reference main animation from assets
-			JObject referenceLayerObject = new JObject {
+			JObject referenceLayerObject = new() {
 				["ind"] = 1,
 				["ty"] = 0,
 				["refId"] = "_",
@@ -560,10 +564,10 @@ namespace RainbowAvatarBot {
 		}
 
 		private static string UnpackAnimatedSticker(byte[] content) {
-			using MemoryStream ms = new MemoryStream(content);
-			using GZipStream gzStream = new GZipStream(ms, CompressionMode.Decompress);
+			using MemoryStream ms = new(content);
+			using GZipStream gzStream = new(ms, CompressionMode.Decompress);
 
-			using StreamReader reader = new StreamReader(gzStream);
+			using StreamReader reader = new(gzStream);
 			return reader.ReadToEnd();
 		}
 	}
