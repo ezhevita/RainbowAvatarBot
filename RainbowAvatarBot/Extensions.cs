@@ -1,7 +1,5 @@
-using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
-using Imazen.WebP;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -26,19 +24,6 @@ namespace RainbowAvatarBot {
 			await image.SaveAsPngAsync(stream, PngEncoder);
 			stream.Position = 0;
 			return stream;
-		}
-
-		internal static async Task<MemoryStream> SaveToWebp(this Image image) {
-			MemoryStream bitmapStream = new();
-			MemoryStream resultStream = new();
-			SimpleEncoder encoder = new();
-			await image.SaveAsPngAsync(bitmapStream, PngEncoder);
-
-			bitmapStream.Seek(0, SeekOrigin.Begin);
-			
-			encoder.Encode(new Bitmap(bitmapStream), resultStream, 95);
-			bitmapStream.Position = 0;
-			return bitmapStream;
 		}
 	}
 }
