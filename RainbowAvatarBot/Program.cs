@@ -119,7 +119,6 @@ namespace RainbowAvatarBot {
 			}
 
 			try {
-				Log(senderID + "|" + e.Message.Type + "|" + textMessage);
 				if (e.Message.Type == MessageType.Text) {
 					string command = args[0].ToUpperInvariant();
 					switch (command) {
@@ -419,7 +418,8 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task ProcessAndSend(string imageID, string imageUniqueID, string overlayName, Message message) {
-			Log(message.From.Id + "|" + message.Type + "|" + imageID);
+			MediaType mediaType = message.Type == MessageType.Sticker ? message.Sticker.IsAnimated ? MediaType.AnimatedSticker : MediaType.Sticker : MediaType.Picture;
+			Log(message.From.Id + "|" + mediaType + "|" + imageID);
 
 			bool isSticker = message.Type == MessageType.Sticker;
 
@@ -443,7 +443,7 @@ namespace RainbowAvatarBot {
 
 				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing);
 				sw = Stopwatch.StartNew();
-				resultImage = await ProcessImage(imageID, overlayName, message.Type == MessageType.Sticker ? message.Sticker.IsAnimated ? MediaType.AnimatedSticker : MediaType.Sticker : MediaType.Picture);
+				resultImage = await ProcessImage(imageID, overlayName, mediaType);
 			}
 
 			Message resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage) : 
@@ -451,7 +451,7 @@ namespace RainbowAvatarBot {
 
 			if (sw != null) {
 				sw.Stop();
-				Log($"Processed {message.Type} in {sw.ElapsedMilliseconds}ms");
+				Log($"Processed {mediaType} in {sw.ElapsedMilliseconds}ms");
 			}
 			
 			if (processMessage != null) {
