@@ -8,9 +8,9 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using ICSharpCode.SharpZipLib.GZip;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp;
@@ -394,25 +394,25 @@ namespace RainbowAvatarBot {
 			BotClient.StopReceiving();
 		}
 
-		private static async Task<Stream> PackAnimatedSticker(string content) {
-			string tempFileName = Path.GetTempFileName();
-			await File.WriteAllTextAsync(tempFileName, content);
-			ProcessStartInfo processStartInfo = new("7z" + (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".exe" : ""), $"a -tgzip \"{tempFileName}.gz\" \"{tempFileName}\" -mx=5") {
-				RedirectStandardOutput = true,
-				UseShellExecute = false
-			};
+		private static async Task<Stream> PackAnimatedSticker(JToken content) {
+			await using MemoryStream memoryStream = new();
+			MemoryStream resultStream = new();
 
-			Process szProcess = Process.Start(processStartInfo);
-			if (szProcess == null) {
-				throw new InvalidOperationException();
+			await using (StreamWriter streamWriter = new(memoryStream, leaveOpen: true))
+			using (JsonTextWriter jsonTextWriter = new(streamWriter) {
+				Formatting = Formatting.None,
+				AutoCompleteOnClose = true,
+				CloseOutput = false
+			}) {
+				await content.WriteToAsync(jsonTextWriter);
 			}
 			
-			await szProcess.WaitForExitAsync();
+			memoryStream.Position = 0;
 
-			FileStream packedMs = new(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
-			File.Delete(tempFileName);
+			GZip.Compress(memoryStream, resultStream, false, 4096, 9);
+			resultStream.Position = 0;
 
-			return packedMs;
+			return resultStream;
 		}
 
 		private static async Task ProcessAndSend(string imageID, string imageUniqueID, string overlayName, Message message) {
@@ -450,7 +450,7 @@ namespace RainbowAvatarBot {
 				}
 
 				if (resultMessage.Sticker == null) {
-					await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
+					//await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
 					await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend);
 					return;
 				}
@@ -483,10 +483,10 @@ namespace RainbowAvatarBot {
 
 			if (mediaType == MediaType.AnimatedSticker) {
 				sw.Stop();
-				var stickerObject = await UnpackAnimatedSticker(file);
+				JObject stickerObject = await UnpackAnimatedSticker(file);
 				Log("Creating: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
-				string processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
+				JObject processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
 				sw.Stop();
 				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
@@ -526,7 +526,7 @@ namespace RainbowAvatarBot {
 			return inputMedia;
 		}
 
-		private static string ProcessLottieAnimation(JObject tokenizedSticker, string overlayName) {
+		private static JObject ProcessLottieAnimation(JObject tokenizedSticker, string overlayName) {
 			JArray layersToken = (JArray) tokenizedSticker["layers"];
 			JArray assetsToken = (JArray) tokenizedSticker["assets"];
 
@@ -564,7 +564,7 @@ namespace RainbowAvatarBot {
 			clonedReferenceObject["ind"] = 3;
 			layersToken.Add(clonedReferenceObject);
 
-			return tokenizedSticker.ToString(Formatting.None);
+			return tokenizedSticker;
 		}
 
 		private static void SetThreadLocale(string languageCode) {
