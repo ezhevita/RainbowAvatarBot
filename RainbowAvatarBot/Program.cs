@@ -496,6 +496,7 @@ namespace RainbowAvatarBot {
 				image = await Image.LoadAsync(file);
 			}
 
+			image.Overlay(Images[overlayName]);
 			InputMedia inputMedia = new(await image.SaveToPng(), "image.png");
 			return inputMedia;
 		}
