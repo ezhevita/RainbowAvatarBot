@@ -252,7 +252,7 @@ namespace RainbowAvatarBot {
 
 		private static async Task<(Stream Result, long Length)> DownloadFile(string fileID) {
 			Telegram.Bot.Types.File file = await BotClient.GetFileAsync(fileID);
-			var responseMessage = await HttpClient.GetAsync(file.FilePath, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+			HttpResponseMessage responseMessage = await HttpClient.GetAsync(file.FilePath, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
 
 			responseMessage.EnsureSuccessStatusCode();
 			return (await responseMessage.Content.ReadAsStreamAsync(), responseMessage.Content.Headers.ContentLength.GetValueOrDefault(0));
@@ -289,7 +289,7 @@ namespace RainbowAvatarBot {
 				byte index = 0;
 				foreach (uint rgbValue in rgbValues) {
 					byte indexCopy = index;
-					
+
 					image.Mutate(img => img.Fill(new Argb32((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)), new RectangleF(0, indexCopy, 1, 1)));
 					index++;
 				}
@@ -335,7 +335,7 @@ namespace RainbowAvatarBot {
 				DefaultRequestVersion = HttpVersion.Version20,
 				Timeout = TimeSpan.FromSeconds(10)
 			};
-			
+
 			GradientOverlay = JObject.Parse(await File.ReadAllTextAsync("gradientOverlay.json"));
 			ReferenceObject = new JObject {
 				["ind"] = 1,
@@ -406,7 +406,7 @@ namespace RainbowAvatarBot {
 			}) {
 				await content.WriteToAsync(jsonTextWriter);
 			}
-			
+
 			memoryStream.Position = 0;
 
 			GZip.Compress(memoryStream, resultStream, false, 4096, 9);
@@ -503,7 +503,7 @@ namespace RainbowAvatarBot {
 
 				byte[] fileArray = memoryStream.ToArray();
 				(int width, int height) = WebPDecoder.GetWebPInfo(fileArray);
-				
+
 				image = Image.WrapMemory<Argb32>(WebPDecoder.DecodeFromBytes(memoryStream.ToArray(), width, height), width, height);
 			} else {
 				image = await Image.LoadAsync(file);
@@ -520,7 +520,7 @@ namespace RainbowAvatarBot {
 			sw.Restart();
 
 			InputMedia inputMedia = new(await image.SaveToPng(), "image.png");
-			
+
 			sw.Stop();
 			Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 			return inputMedia;

@@ -5,7 +5,6 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
-using Image = SixLabors.ImageSharp.Image;
 
 namespace RainbowAvatarBot {
 	internal static class Extensions {
@@ -18,7 +17,7 @@ namespace RainbowAvatarBot {
 			// ReSharper disable once AccessToDisposedClosure
 			sourceImage.Mutate(img => img.DrawImage(resized, PixelColorBlendingMode.HardLight, PixelAlphaCompositionMode.SrcAtop, 0.5f));
 		}
-		
+
 		internal static async Task<MemoryStream> SaveToPng(this Image image) {
 			MemoryStream stream = new();
 			await image.SaveAsPngAsync(stream, PngEncoder);
