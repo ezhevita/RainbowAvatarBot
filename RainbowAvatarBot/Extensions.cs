@@ -1,130 +1,38 @@
-using System;
-using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Imazen.WebP;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Processing.Processors.Transforms;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace RainbowAvatarBot {
 	internal static class Extensions {
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
-			Bitmap resized = ResizeImage(overlayImage, sourceImage.Width, sourceImage.Height);
-			try {
-				resized.SetResolution(sourceImage.HorizontalResolution, sourceImage.VerticalResolution);
-			} catch (ArgumentException) {
-				// ignored
-			}
-
-			sourceImage.OverlayHardLight(resized);
+			using Image resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height, new NearestNeighborResampler()));
+			// ReSharper disable once AccessToDisposedClosure
+			sourceImage.Mutate(img => img.DrawImage(resized, PixelColorBlendingMode.HardLight, PixelAlphaCompositionMode.SrcAtop, 0.5f));
 		}
-
-		private static unsafe void OverlayHardLight(this Image sourceImage, Image overlayImage) {
-			Bitmap sourceBitmap = (Bitmap) sourceImage;
-			Bitmap overlayBitmap = (Bitmap) overlayImage;
-			Bitmap newOverlayBitmap = new(sourceBitmap.Width, sourceBitmap.Height);
-
-			bool supportTransparency = Equals(sourceImage.RawFormat, ImageFormat.Png) || Equals(sourceImage.RawFormat, ImageFormat.MemoryBmp);
-			Rectangle rect = new(0, 0, sourceBitmap.Width, sourceBitmap.Height);
-			BitmapData sourceData = sourceBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
-			BitmapData overlayData = overlayBitmap.LockBits(rect, ImageLockMode.ReadOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
-			BitmapData newOverlayData = newOverlayBitmap.LockBits(rect, ImageLockMode.WriteOnly, supportTransparency ? PixelFormat.Format32bppArgb : PixelFormat.Format24bppRgb);
-
-			byte* sourcePointer = (byte*) sourceData.Scan0.ToPointer();
-			byte* overlayPointer = (byte*) overlayData.Scan0.ToPointer();
-			byte* newOverlayPointer = (byte*) newOverlayData.Scan0.ToPointer();
-
-			int overlayLength = Math.Abs(newOverlayData.Stride) * newOverlayBitmap.Height;
-			if (supportTransparency) {
-				Parallel.For(0, overlayLength / 4 * 3, i => { newOverlayPointer[i + i / 3] = ProcessHardLight(sourcePointer[i + i / 3], overlayPointer[i + i / 3]); });
-
-				Parallel.For(0, overlayLength / 4, i => newOverlayPointer[i * 4 + 3] = sourcePointer[i * 4 + 3]);
-			} else {
-				Parallel.For(0, overlayLength, i => newOverlayPointer[i] = ProcessHardLight(sourcePointer[i], overlayPointer[i]));
-			}
-
-			sourceBitmap.UnlockBits(sourceData);
-			overlayBitmap.UnlockBits(overlayData);
-			newOverlayBitmap.UnlockBits(newOverlayData);
-
-			if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-				sourceBitmap.SetResolution(newOverlayBitmap.HorizontalResolution, newOverlayBitmap.VerticalResolution);
-			}
-
-			using Graphics graphics = Graphics.FromImage(sourceBitmap);
-			graphics.DrawImage(newOverlayBitmap.SetOpacity(0.5f), 0, 0);
-		}
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining | MethodImplOptions.AggressiveOptimization)]
-		private static byte ProcessHardLight(byte source, byte overlay) => (byte) (overlay < 128 ? 2 * source * overlay / 255 : 255 - 2 * (255 - source) * (255 - overlay) / 255);
-
-		private static Bitmap ResizeImage(Image image, int width, int height) {
-			Bitmap destImage = new(width, height);
-
-			destImage.SetResolution(image.HorizontalResolution, image.VerticalResolution);
-
-			using Graphics graphics = Graphics.FromImage(destImage);
-			graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
-			graphics.SmoothingMode = SmoothingMode.HighQuality;
-			graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-			graphics.DrawImage(image, 0, 0, width, height);
-
-			return destImage;
-		}
-
+		
 		internal static MemoryStream SaveToPng(this Image image) {
 			MemoryStream stream = new();
-			image.Save(stream, ImageFormat.Png);
+			image.SaveAsPng(stream);
 			stream.Position = 0;
 			return stream;
 		}
 
 		internal static MemoryStream SaveToWebp(this Image image) {
-			MemoryStream stream = new();
+			MemoryStream bitmapStream = new();
+			MemoryStream resultStream = new();
 			SimpleEncoder encoder = new();
-			encoder.Encode((Bitmap) image, stream, 95);
-			stream.Position = 0;
-			return stream;
-		}
-
-		private static Image SetOpacity(this Image image, float opacity) {
-			ColorMatrix colorMatrix = new() {
-				Matrix33 = opacity
-			};
-
-			ImageAttributes imageAttributes = new();
-			imageAttributes.SetColorMatrix(
-				colorMatrix,
-				ColorMatrixFlag.Default,
-				ColorAdjustType.Bitmap);
-
-			Bitmap output = new(image.Width, image.Height);
-			using Graphics gfx = Graphics.FromImage(output);
-			gfx.SmoothingMode = SmoothingMode.AntiAlias;
-			gfx.DrawImage(image, new Rectangle(0, 0, image.Width, image.Height), 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, imageAttributes);
-
-			return output;
-		}
-
-		public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default) {
-			if (process.HasExited) {
-				return Task.CompletedTask;
-			}
-
-			TaskCompletionSource<object> tcs = new();
-			process.EnableRaisingEvents = true;
-			process.Exited += (sender, args) => tcs.TrySetResult(null);
-
-			if (cancellationToken != default) {
-				cancellationToken.Register(() => tcs.SetCanceled());
-			}
-
-			return process.HasExited ? Task.CompletedTask : tcs.Task;
+			image.Save(bitmapStream, PngFormat.Instance);
+			bitmapStream.Seek(0, SeekOrigin.Begin);
+			
+			encoder.Encode(new Bitmap(bitmapStream), resultStream, 95);
+			bitmapStream.Position = 0;
+			return bitmapStream;
 		}
 	}
 }

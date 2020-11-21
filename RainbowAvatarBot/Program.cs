@@ -2,19 +2,22 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Imazen.WebP;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -29,9 +32,9 @@ namespace RainbowAvatarBot {
 
 		private static readonly ResultCache ResultCache = new();
 
-		private static readonly Timer ClearUsersTimer = new(e => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+		private static readonly Timer ClearUsersTimer = new(_ => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new();
-		private static readonly Timer ResetTimer = new(e => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
+		private static readonly Timer ResetTimer = new(_ => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
 		private static readonly SemaphoreSlim ShutdownSemaphore = new(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
 
@@ -43,8 +46,10 @@ namespace RainbowAvatarBot {
 		private static TelegramBotClient BotClient;
 		private static ConcurrentDictionary<int, string> UserSettings = new();
 		private static JObject GradientOverlay;
+		private static JObject ReferenceObject;
 		private static Dictionary<string, uint[]> Flags;
 		private static Dictionary<string, float[]> FlagGradients;
+		private static HttpClient HttpClient;
 
 		private static async void BotOnCallbackQuery(object sender, CallbackQueryEventArgs e) {
 			if (e?.CallbackQuery == null) {
@@ -245,11 +250,12 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<byte[]> DownloadFile(string fileID) {
-			await using MemoryStream stream = new();
-			await BotClient.GetInfoAndDownloadFileAsync(fileID, stream);
-			stream.Position = 0;
-			return stream.ToArray();
+		private static async Task<(Stream Result, long Length)> DownloadFile(string fileID) {
+			Telegram.Bot.Types.File file = await BotClient.GetFileAsync(fileID);
+			var responseMessage = await HttpClient.GetAsync(file.FilePath, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+
+			responseMessage.EnsureSuccessStatusCode();
+			return (await responseMessage.Content.ReadAsStreamAsync(), responseMessage.Content.Headers.ContentLength.GetValueOrDefault(0));
 		}
 
 		private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues) {
@@ -279,24 +285,23 @@ namespace RainbowAvatarBot {
 
 		private static void GenerateImages(Dictionary<string, uint[]> flags) {
 			foreach ((string name, uint[] rgbValues) in flags) {
-				using Bitmap image = new(1, rgbValues.Length);
-				using Graphics graphics = Graphics.FromImage(image);
-
+				using Image<Rgba32> image = new(1, rgbValues.Length);
 				byte index = 0;
 				foreach (uint rgbValue in rgbValues) {
-					using SolidBrush brush = new(Color.FromArgb((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)));
-					graphics.FillRectangle(brush, new RectangleF(0, index, 1, 1));
+					byte indexCopy = index;
+					
+					image.Mutate(img => img.Fill(new Argb32((byte) (rgbValue >> 16), (byte) ((rgbValue >> 8) & 0xFF), (byte) (rgbValue & 0xFF)), new RectangleF(0, indexCopy, 1, 1)));
 					index++;
 				}
 
-				image.Save(Path.Join("images", $"{name}.png"), ImageFormat.Png);
+				image.Save(Path.Join("images", $"{name}.png"), new PngEncoder());
 			}
 		}
 
-		private static void LoadImages() {
+		private static async Task LoadImages() {
 			foreach (string file in Directory.EnumerateFiles("images")) {
 				string name = Path.GetFileNameWithoutExtension(file);
-				Images.Add(name, Image.FromFile(file));
+				Images.Add(name, await Image.LoadAsync(file));
 			}
 		}
 
@@ -319,7 +324,43 @@ namespace RainbowAvatarBot {
 				return;
 			}
 
+			HttpClient = new HttpClient(new HttpClientHandler {
+				AllowAutoRedirect = false,
+				AutomaticDecompression = DecompressionMethods.All,
+				UseCookies = false,
+				UseProxy = false,
+				MaxConnectionsPerServer = 255
+			}) {
+				BaseAddress = new Uri($"https://api.telegram.org/file/bot{token}/"),
+				DefaultRequestVersion = HttpVersion.Version20,
+				Timeout = TimeSpan.FromSeconds(10)
+			};
+			
 			GradientOverlay = JObject.Parse(await File.ReadAllTextAsync("gradientOverlay.json"));
+			ReferenceObject = new JObject {
+				["ind"] = 1,
+				["ty"] = 0,
+				["refId"] = "_",
+				["sr"] = 1,
+				["ks"] = new JObject {
+					["o"] = new JObject {
+						["a"] = 0,
+						["k"] = 100
+					},
+					["r"] = new JObject {
+						["a"] = 0,
+						["k"] = 0
+					},
+					["p"] = new JObject {
+						["k"] = new JArray(256, 256, 0)
+					},
+					["a"] = new JObject {
+						["k"] = new JArray(256, 256, 0)
+					}
+				},
+				["w"] = 512,
+				["h"] = 512
+			};
 
 			if (!Directory.Exists("images")) {
 				Directory.CreateDirectory("images");
@@ -331,7 +372,7 @@ namespace RainbowAvatarBot {
 				GenerateImages(Flags);
 			}
 
-			LoadImages();
+			await LoadImages();
 
 			FlagGradients = new Dictionary<string, float[]>(Flags.Count);
 			foreach ((string flagName, uint[] rgbValues) in Flags) {
@@ -362,6 +403,10 @@ namespace RainbowAvatarBot {
 			};
 
 			Process szProcess = Process.Start(processStartInfo);
+			if (szProcess == null) {
+				throw new InvalidOperationException();
+			}
+			
 			await szProcess.WaitForExitAsync();
 
 			FileStream packedMs = new(tempFileName + ".gz", FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous | FileOptions.SequentialScan);
@@ -393,7 +438,7 @@ namespace RainbowAvatarBot {
 				}
 
 				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing);
-				resultImage = await ProcessImage(imageID, overlayName);
+				resultImage = await ProcessImage(imageID, overlayName, message.Type == MessageType.Sticker ? message.Sticker.IsAnimated ? MediaType.AnimatedSticker : MediaType.Sticker : MediaType.Picture);
 			}
 
 			if (isSticker) {
@@ -427,25 +472,21 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static byte[] GZipBytes = {0x1f, 0x8b, 0x08};
-		private static byte[] RiffBytes = Encoding.UTF8.GetBytes("RIFF");
-		private static byte[] WebpBytes = Encoding.UTF8.GetBytes("WEBP");
-		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName) {
+		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName, MediaType mediaType) {
 			Stopwatch sw = Stopwatch.StartNew();
-			byte[] file = await DownloadFile(fileId);
+			(Stream Result, long Length) fileData = await DownloadFile(fileId);
+			await using Stream file = fileData.Result;
 
 			sw.Stop();
 			Log("Downloading: " + sw.ElapsedMilliseconds + "ms");
 			sw.Restart();
 
-			// GZip check, checking for magic number + compression method (DEFLATE)
-			bool isGZip = file[..3].SequenceEqual(GZipBytes);
-			if (isGZip) {
+			if (mediaType == MediaType.AnimatedSticker) {
 				sw.Stop();
-				string jsonSticker = UnpackAnimatedSticker(file);
+				var stickerObject = await UnpackAnimatedSticker(file);
 				Log("Creating: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
-				string processedAnimation = ProcessLottieAnimation(jsonSticker, overlayName);
+				string processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
 				sw.Stop();
 				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
 				sw.Restart();
@@ -456,14 +497,16 @@ namespace RainbowAvatarBot {
 			}
 
 			Image image;
-			// WebP check, checking if header contains `RIFF` and `WEBP`
-			bool isWebp = file[..4].SequenceEqual(RiffBytes) && file[8..12].SequenceEqual(WebpBytes);
+			if (mediaType == MediaType.Sticker) {
+				MemoryStream memoryStream = new((int) fileData.Length);
+				await file.CopyToAsync(memoryStream);
 
-			if (isWebp) {
-				SimpleDecoder decoder = new();
-				image = decoder.DecodeFromBytes(file, file.Length);
+				byte[] fileArray = memoryStream.ToArray();
+				(int width, int height) = WebPDecoder.GetWebPInfo(fileArray);
+				
+				image = Image.WrapMemory<Argb32>(WebPDecoder.DecodeFromBytes(memoryStream.ToArray(), width, height), width, height);
 			} else {
-				image = Image.FromStream(new MemoryStream(file));
+				image = await Image.LoadAsync(file);
 			}
 
 			sw.Stop();
@@ -476,14 +519,18 @@ namespace RainbowAvatarBot {
 
 			sw.Restart();
 
-			InputMedia inputMedia = isWebp ? new InputMedia(image.SaveToWebp(), "sticker.webp") : new InputMedia(image.SaveToPng(), "image.png");
+			InputMedia inputMedia = mediaType switch {
+				MediaType.Sticker => new InputMedia(image.SaveToWebp(), "sticker.webp"),
+				MediaType.Picture => new InputMedia(image.SaveToPng(), "image.png"),
+				_ => throw new ArgumentException(@"Invalid argument", nameof(mediaType))
+			};
+			
 			sw.Stop();
 			Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 			return inputMedia;
 		}
 
-		private static string ProcessLottieAnimation(string jsonText, string overlayName) {
-			JObject tokenizedSticker = JObject.Parse(jsonText);
+		private static string ProcessLottieAnimation(JObject tokenizedSticker, string overlayName) {
 			JArray layersToken = (JArray) tokenizedSticker["layers"];
 			JArray assetsToken = (JArray) tokenizedSticker["assets"];
 
@@ -502,33 +549,9 @@ namespace RainbowAvatarBot {
 			assetsToken.Add(assetToken);
 
 			// Layer that reference main animation from assets
-			JObject referenceLayerObject = new() {
-				["ind"] = 1,
-				["ty"] = 0,
-				["refId"] = "_",
-				["sr"] = 1,
-				["ks"] = new JObject {
-					["o"] = new JObject {
-						["a"] = 0,
-						["k"] = 100
-					},
-					["r"] = new JObject {
-						["a"] = 0,
-						["k"] = 0
-					},
-					["p"] = new JObject {
-						["k"] = new JArray(256, 256, 0)
-					},
-					["a"] = new JObject {
-						["k"] = new JArray(256, 256, 0)
-					}
-				},
-				["w"] = 512,
-				["h"] = 512,
-				["op"] = lastFrame
-			};
-
-			layersToken.Add(referenceLayerObject);
+			JToken clonedReferenceLayerObject = ReferenceObject.DeepClone();
+			clonedReferenceLayerObject["op"] = lastFrame;
+			layersToken.Add(clonedReferenceLayerObject);
 
 			// Overlaying gradient
 			JObject gradientOverlayObject = (JObject) GradientOverlay.DeepClone();
@@ -541,7 +564,7 @@ namespace RainbowAvatarBot {
 			gFillObject["k"]["k"] = new JArray(gradientProps);
 			layersToken.Add(gradientOverlayObject);
 
-			JToken clonedReferenceObject = referenceLayerObject.DeepClone();
+			JToken clonedReferenceObject = clonedReferenceLayerObject.DeepClone();
 			clonedReferenceObject["ind"] = 3;
 			layersToken.Add(clonedReferenceObject);
 
@@ -563,12 +586,11 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static string UnpackAnimatedSticker(byte[] content) {
-			using MemoryStream ms = new(content);
-			using GZipStream gzStream = new(ms, CompressionMode.Decompress);
+		private static async Task<JObject> UnpackAnimatedSticker(Stream content) {
+			await using GZipStream gzStream = new(content, CompressionMode.Decompress);
 
 			using StreamReader reader = new(gzStream);
-			return reader.ReadToEnd();
+			return await JObject.LoadAsync(new JsonTextReader(reader));
 		}
 	}
 }

@@ -13,8 +13,19 @@
 	
 	<ItemGroup>
 		<ProjectReference Include="..\..\libwebp-net\src\Imazen.WebP\Imazen.WebP.csproj" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="1.0.2" />
+		<PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta11" />
 		<PackageReference Include="System.Drawing.Common" Version="5.0.0-preview.6.20305.6" />
 		<PackageReference Include="Telegram.Bot" Version="15.7.1" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <None Update="flags.json">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="gradientOverlay.json">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 
 </Project>
