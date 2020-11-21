@@ -520,8 +520,8 @@ namespace RainbowAvatarBot {
 			sw.Restart();
 
 			InputMedia inputMedia = mediaType switch {
-				MediaType.Sticker => new InputMedia(image.SaveToWebp(), "sticker.webp"),
-				MediaType.Picture => new InputMedia(image.SaveToPng(), "image.png"),
+				MediaType.Sticker => new InputMedia(await image.SaveToWebp(), "sticker.webp"),
+				MediaType.Picture => new InputMedia(await image.SaveToPng(), "image.png"),
 				_ => throw new ArgumentException(@"Invalid argument", nameof(mediaType))
 			};
 			
