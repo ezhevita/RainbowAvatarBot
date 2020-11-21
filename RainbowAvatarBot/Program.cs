@@ -44,6 +44,7 @@ namespace RainbowAvatarBot {
 		};
 
 		private static TelegramBotClient BotClient;
+		private static string BotUsername;
 		private static ConcurrentDictionary<int, string> UserSettings = new();
 		private static JObject GradientOverlay;
 		private static JObject ReferenceObject;
@@ -104,7 +105,7 @@ namespace RainbowAvatarBot {
 			if (!string.IsNullOrEmpty(textMessage) && (textMessage[0] == '/')) {
 				string argumentToProcess = textMessage.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
 				if (argumentToProcess.Contains('@')) {
-					if (argumentToProcess.Substring(argumentToProcess.IndexOf('@') + 1) != nameof(RainbowAvatarBot)) {
+					if (argumentToProcess.Substring(argumentToProcess.IndexOf('@') + 1) != BotUsername) {
 						return;
 					}
 
@@ -324,6 +325,8 @@ namespace RainbowAvatarBot {
 				return;
 			}
 
+			BotUsername = (await BotClient.GetMeAsync()).Username;
+
 			HttpClient = new HttpClient(new HttpClientHandler {
 				AllowAutoRedirect = false,
 				AutomaticDecompression = DecompressionMethods.All,
@@ -383,7 +386,7 @@ namespace RainbowAvatarBot {
 			BotClient.OnCallbackQuery += BotOnCallbackQuery;
 			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
 
-			Log("Started!");
+			Log($"Started {BotUsername}!");
 			await ShutdownSemaphore.WaitAsync();
 			await ClearUsersTimer.DisposeAsync();
 			await ResetTimer.DisposeAsync();
@@ -420,6 +423,7 @@ namespace RainbowAvatarBot {
 
 			bool isSticker = message.Type == MessageType.Sticker;
 
+			Stopwatch sw = null;
 			bool isCached;
 			InputMedia resultImage;
 			Message processMessage = null;
@@ -438,61 +442,44 @@ namespace RainbowAvatarBot {
 				}
 
 				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing);
+				sw = Stopwatch.StartNew();
 				resultImage = await ProcessImage(imageID, overlayName, message.Type == MessageType.Sticker ? message.Sticker.IsAnimated ? MediaType.AnimatedSticker : MediaType.Sticker : MediaType.Picture);
 			}
 
-			if (isSticker) {
-				Message resultMessage = await BotClient.SendStickerAsync(message.Chat.Id, resultImage);
-				if (processMessage != null) {
-					#pragma warning disable 4014
-					BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
-					#pragma warning restore 4014
-				}
+			Message resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage) : 
+				await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
 
-				if (resultMessage.Sticker == null) {
-					//await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
-					await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend);
-					return;
-				}
+			if (sw != null) {
+				sw.Stop();
+				Log($"Processed {message.Type} in {sw.ElapsedMilliseconds}ms");
+			}
+			
+			if (processMessage != null) {
+				#pragma warning disable 4014
+				BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
+				#pragma warning restore 4014
+			}
 
-				if (!isCached) {
-					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Sticker.FileId);
-				}
-			} else {
-				Message resultMessage = await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
-				if (processMessage != null) {
-					#pragma warning disable 4014
-					BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
-					#pragma warning restore 4014
-				}
+			if (isSticker && (resultMessage.Sticker == null)) {
+				await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
+				await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend);
+				return;
+			}
 
-				if (!isCached) {
-					ResultCache.TryAdd(imageUniqueID, overlayName, resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
-				}
+			if (!isCached) {
+				ResultCache.TryAdd(imageUniqueID, overlayName, isSticker ? resultMessage.Sticker.FileId : 
+					resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 			}
 		}
 
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName, MediaType mediaType) {
-			Stopwatch sw = Stopwatch.StartNew();
 			(Stream Result, long Length) fileData = await DownloadFile(fileId);
 			await using Stream file = fileData.Result;
 
-			sw.Stop();
-			Log("Downloading: " + sw.ElapsedMilliseconds + "ms");
-			sw.Restart();
-
 			if (mediaType == MediaType.AnimatedSticker) {
-				sw.Stop();
 				JObject stickerObject = await UnpackAnimatedSticker(file);
-				Log("Creating: " + sw.ElapsedMilliseconds + "ms");
-				sw.Restart();
 				JObject processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
-				sw.Stop();
-				Log("Processing: " + sw.ElapsedMilliseconds + "ms");
-				sw.Restart();
 				InputMedia inputMediaAnimated = new(await PackAnimatedSticker(processedAnimation), "sticker.tgs");
-				sw.Stop();
-				Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 				return inputMediaAnimated;
 			}
 
@@ -509,20 +496,7 @@ namespace RainbowAvatarBot {
 				image = await Image.LoadAsync(file);
 			}
 
-			sw.Stop();
-			Log("Creating: " + sw.ElapsedMilliseconds + "ms");
-			sw.Restart();
-
-			image.Overlay(Images[overlayName]);
-			sw.Stop();
-			Log("Processing: " + sw.ElapsedMilliseconds + "ms");
-
-			sw.Restart();
-
 			InputMedia inputMedia = new(await image.SaveToPng(), "image.png");
-
-			sw.Stop();
-			Log("Saving: " + sw.ElapsedMilliseconds + "ms");
 			return inputMedia;
 		}
 
