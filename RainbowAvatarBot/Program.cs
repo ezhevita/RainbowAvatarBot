@@ -24,6 +24,7 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using File = System.IO.File;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace RainbowAvatarBot {
 	internal static class Program {
@@ -32,6 +33,7 @@ namespace RainbowAvatarBot {
 
 		private static readonly ResultCache ResultCache = new();
 
+		private static readonly SemaphoreSlim FileSemaphore = new(1, 1);
 		private static readonly Timer ClearUsersTimer = new(_ => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new();
 		private static readonly Timer ResetTimer = new(_ => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
@@ -71,7 +73,7 @@ namespace RainbowAvatarBot {
 				case "SETTINGS": {
 					string name = args[1];
 					if (!Images.ContainsKey(name)) {
-						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.InvalidFlagName);
+						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.InvalidFlagName).ConfigureAwait(false);
 						return;
 					}
 
@@ -81,9 +83,16 @@ namespace RainbowAvatarBot {
 						UserSettings[senderID] = name;
 					}
 
-					await File.WriteAllTextAsync("config.json", JsonConvert.SerializeObject(UserSettings));
-					await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, Localization.ChangedSuccessfully, replyMarkup: InlineKeyboardMarkup.Empty());
-					await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success);
+					await FileSemaphore.WaitAsync().ConfigureAwait(false);
+					try {
+						await using FileStream configFile = File.OpenWrite("config.json");
+						await JsonSerializer.SerializeAsync(configFile, UserSettings).ConfigureAwait(false);
+						await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, Localization.ChangedSuccessfully, replyMarkup: InlineKeyboardMarkup.Empty()).ConfigureAwait(false);
+						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success).ConfigureAwait(false);
+					} finally {
+						FileSemaphore.Release();
+					}
+
 					break;
 				}
 			}
@@ -134,21 +143,21 @@ namespace RainbowAvatarBot {
 
 							UserProfilePhotos avatars;
 							if (e.Message.ReplyToMessage != null) {
-								avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1);
+								avatars = await BotClient.GetUserProfilePhotosAsync(e.Message.ReplyToMessage.From.Id, limit: 1).ConfigureAwait(false);
 								if (avatars.Photos.Length == 0) {
-									await BotClient.SendTextMessageAsync(senderID, Localization.RepliedUserProfilePictureNotFound, replyToMessageId: e.Message.MessageId);
+									await BotClient.SendTextMessageAsync(senderID, Localization.RepliedUserProfilePictureNotFound, replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 									return;
 								}
 							} else {
-								avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1);
+								avatars = await BotClient.GetUserProfilePhotosAsync(senderID, limit: 1).ConfigureAwait(false);
 								if (avatars.Photos.Length == 0) {
-									await BotClient.SendTextMessageAsync(senderID, Localization.UserProfilePictureNotFound, replyToMessageId: e.Message.MessageId);
+									await BotClient.SendTextMessageAsync(senderID, Localization.UserProfilePictureNotFound, replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 									return;
 								}
 							}
 
 							PhotoSize sourceImage = avatars.Photos[0].OrderByDescending(photo => photo.Height).First();
-							await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message);
+							await ProcessAndSend(sourceImage.FileId, sourceImage.FileUniqueId, overlayName, e.Message).ConfigureAwait(false);
 							break;
 						}
 
@@ -170,12 +179,12 @@ namespace RainbowAvatarBot {
 								uniqueFileID = sticker.FileUniqueId;
 							}
 
-							await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message.ReplyToMessage);
+							await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message.ReplyToMessage).ConfigureAwait(false);
 							break;
 						}
 
 						case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
-							await BotClient.SendTextMessageAsync(chatID, Localization.SettingsSentToChat, replyToMessageId: e.Message.MessageId);
+							await BotClient.SendTextMessageAsync(chatID, Localization.SettingsSentToChat, replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 							break;
 						}
 
@@ -183,13 +192,13 @@ namespace RainbowAvatarBot {
 							await BotClient.SendTextMessageAsync(chatID, Localization.SelectFlag, replyMarkup: BuildKeyboard(3, Images.Keys.Select(name => new InlineKeyboardButton {
 								CallbackData = "SETTINGS_" + name,
 								Text = Localization.ResourceManager.GetString(name)
-							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId);
+							}).OrderBy(button => button.Text)), replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 							break;
 						}
 
 						default: {
 							if (e.Message.Chat.Type == ChatType.Private) {
-								await BotClient.SendTextMessageAsync(chatID, Localization.StartMessage, replyToMessageId: e.Message.MessageId, parseMode: ParseMode.MarkdownV2);
+								await BotClient.SendTextMessageAsync(chatID, Localization.StartMessage, replyToMessageId: e.Message.MessageId, parseMode: ParseMode.MarkdownV2).ConfigureAwait(false);
 							}
 
 							break;
@@ -212,14 +221,14 @@ namespace RainbowAvatarBot {
 						uniqueFileID = sticker.FileUniqueId;
 					}
 
-					await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message);
+					await ProcessAndSend(fileID, uniqueFileID, overlayName, e.Message).ConfigureAwait(false);
 				}
 			} catch (Exception ex) {
 				Log("Exception has been thrown!");
 				Log(ex.ToString());
 				try {
-					await BotClient.SendTextMessageAsync(chatID, Localization.ErrorOccured, replyToMessageId: e.Message.MessageId);
-				} catch (Exception) {
+					await BotClient.SendTextMessageAsync(chatID, Localization.ErrorOccured, replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
+				} catch {
 					// ignored
 				}
 			}
@@ -251,11 +260,11 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task<(Stream Result, long Length)> DownloadFile(string fileID) {
-			Telegram.Bot.Types.File file = await BotClient.GetFileAsync(fileID);
+			Telegram.Bot.Types.File file = await BotClient.GetFileAsync(fileID).ConfigureAwait(false);
 			HttpResponseMessage responseMessage = await HttpClient.GetAsync(file.FilePath, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
 
 			responseMessage.EnsureSuccessStatusCode();
-			return (await responseMessage.Content.ReadAsStreamAsync(), responseMessage.Content.Headers.ContentLength.GetValueOrDefault(0));
+			return (await responseMessage.Content.ReadAsStreamAsync().ConfigureAwait(false), responseMessage.Content.Headers.ContentLength.GetValueOrDefault(0));
 		}
 
 		private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues) {
@@ -301,7 +310,7 @@ namespace RainbowAvatarBot {
 		private static async Task LoadImages() {
 			foreach (string file in Directory.EnumerateFiles("images")) {
 				string name = Path.GetFileNameWithoutExtension(file);
-				Images.Add(name, await Image.LoadAsync(file));
+				Images.Add(name, await Image.LoadAsync(file).ConfigureAwait(false));
 			}
 		}
 
@@ -313,18 +322,19 @@ namespace RainbowAvatarBot {
 
 		private static async Task Main() {
 			if (File.Exists("config.json")) {
-				UserSettings = JsonConvert.DeserializeObject<ConcurrentDictionary<int, string>>(File.ReadAllText("config.json"));
+				await using FileStream configFile = File.OpenRead("config.json");
+				UserSettings = await JsonSerializer.DeserializeAsync<ConcurrentDictionary<int, string>>(configFile).ConfigureAwait(false);
 			}
 
 			Log("Starting " + nameof(RainbowAvatarBot));
-			string token = await File.ReadAllTextAsync("token.txt");
+			string token = await File.ReadAllTextAsync("token.txt").ConfigureAwait(false);
 			BotClient = new TelegramBotClient(token);
-			if (!await BotClient.TestApiAsync()) {
+			if (!await BotClient.TestApiAsync().ConfigureAwait(false)) {
 				Log("Error when starting bot!");
 				return;
 			}
 
-			BotUsername = (await BotClient.GetMeAsync()).Username;
+			BotUsername = (await BotClient.GetMeAsync().ConfigureAwait(false)).Username;
 
 			HttpClient = new HttpClient(new HttpClientHandler {
 				AllowAutoRedirect = false,
@@ -338,7 +348,11 @@ namespace RainbowAvatarBot {
 				Timeout = TimeSpan.FromSeconds(10)
 			};
 
-			GradientOverlay = JObject.Parse(await File.ReadAllTextAsync("gradientOverlay.json"));
+			using (StreamReader gradientFile = File.OpenText("gradientOverlay.json")) {
+				using JsonTextReader gradientJsonReader = new(gradientFile);
+				GradientOverlay = await JObject.LoadAsync(gradientJsonReader).ConfigureAwait(false);
+			}
+
 			ReferenceObject = new JObject {
 				["ind"] = 1,
 				["ty"] = 0,
@@ -368,13 +382,17 @@ namespace RainbowAvatarBot {
 				Directory.CreateDirectory("images");
 			}
 
-			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(await File.ReadAllTextAsync("flags.json")).Where(name => !File.Exists(Path.Join("images", name + ".png"))).ToDictionary(x => x.Key, y => y.Value);
+			// Using Newtonsoft.Json because System.Text.Json doesn't support JSON5 format (and hexadicimal numbers)
+			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(await File.ReadAllTextAsync("flags.json").ConfigureAwait(false))
+			                   .Where(name => !File.Exists(Path.Join("images", name + ".png")))
+			                   .ToDictionary(x => x.Key, y => y.Value);
+
 			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
 			if (Flags.Keys.Any(name => !existFiles.Contains(name))) {
 				GenerateImages(Flags);
 			}
 
-			await LoadImages();
+			await LoadImages().ConfigureAwait(false);
 
 			FlagGradients = new Dictionary<string, float[]>(Flags.Count);
 			foreach ((string flagName, uint[] rgbValues) in Flags) {
@@ -386,9 +404,9 @@ namespace RainbowAvatarBot {
 			BotClient.StartReceiving(new[] {UpdateType.Message, UpdateType.CallbackQuery});
 
 			Log($"Started {BotUsername}!");
-			await ShutdownSemaphore.WaitAsync();
-			await ClearUsersTimer.DisposeAsync();
-			await ResetTimer.DisposeAsync();
+			await ShutdownSemaphore.WaitAsync().ConfigureAwait(false);
+			await ClearUsersTimer.DisposeAsync().ConfigureAwait(false);
+			await ResetTimer.DisposeAsync().ConfigureAwait(false);
 			foreach ((_, Image image) in Images) {
 				image.Dispose();
 			}
@@ -406,7 +424,7 @@ namespace RainbowAvatarBot {
 				AutoCompleteOnClose = true,
 				CloseOutput = false
 			}) {
-				await content.WriteToAsync(jsonTextWriter);
+				await content.WriteToAsync(jsonTextWriter).ConfigureAwait(false);
 			}
 
 			memoryStream.Position = 0;
@@ -441,13 +459,13 @@ namespace RainbowAvatarBot {
 					LastUserImageGenerations.TryAdd(senderID, DateTime.UtcNow);
 				}
 
-				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing);
+				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing).ConfigureAwait(false);
 				sw = Stopwatch.StartNew();
-				resultImage = await ProcessImage(imageID, overlayName, mediaType);
+				resultImage = await ProcessImage(imageID, overlayName, mediaType).ConfigureAwait(false);
 			}
 
-			Message resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage) : 
-				await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId);
+			Message resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : 
+				await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
 
 			if (sw != null) {
 				sw.Stop();
@@ -461,8 +479,8 @@ namespace RainbowAvatarBot {
 			}
 
 			if (isSticker && (resultMessage.Sticker == null)) {
-				await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId);
-				await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend);
+				await BotClient.DeleteMessageAsync(resultMessage.Chat, resultMessage.MessageId).ConfigureAwait(false);
+				await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.UnableToSend).ConfigureAwait(false);
 				return;
 			}
 
@@ -473,31 +491,31 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName, MediaType mediaType) {
-			(Stream Result, long Length) fileData = await DownloadFile(fileId);
+			(Stream Result, long Length) fileData = await DownloadFile(fileId).ConfigureAwait(false);
 			await using Stream file = fileData.Result;
 
 			if (mediaType == MediaType.AnimatedSticker) {
-				JObject stickerObject = await UnpackAnimatedSticker(file);
+				JObject stickerObject = await UnpackAnimatedSticker(file).ConfigureAwait(false);
 				JObject processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
-				InputMedia inputMediaAnimated = new(await PackAnimatedSticker(processedAnimation), "sticker.tgs");
+				InputMedia inputMediaAnimated = new(await PackAnimatedSticker(processedAnimation).ConfigureAwait(false), "sticker.tgs");
 				return inputMediaAnimated;
 			}
 
 			Image image;
 			if (mediaType == MediaType.Sticker) {
-				MemoryStream memoryStream = new((int) fileData.Length);
-				await file.CopyToAsync(memoryStream);
+				await using MemoryStream memoryStream = new((int) fileData.Length);
+				await file.CopyToAsync(memoryStream).ConfigureAwait(false);
 
 				byte[] fileArray = memoryStream.ToArray();
 				(int width, int height) = WebPDecoder.GetWebPInfo(fileArray);
 
 				image = Image.WrapMemory<Argb32>(WebPDecoder.DecodeFromBytes(memoryStream.ToArray(), width, height), width, height);
 			} else {
-				image = await Image.LoadAsync(file);
+				image = await Image.LoadAsync(file).ConfigureAwait(false);
 			}
 
 			image.Overlay(Images[overlayName]);
-			InputMedia inputMedia = new(await image.SaveToPng(), "image.png");
+			InputMedia inputMedia = new(await image.SaveToPng().ConfigureAwait(false), "image.png");
 			return inputMedia;
 		}
 
@@ -561,7 +579,7 @@ namespace RainbowAvatarBot {
 			await using GZipStream gzStream = new(content, CompressionMode.Decompress);
 
 			using StreamReader reader = new(gzStream);
-			return await JObject.LoadAsync(new JsonTextReader(reader));
+			return await JObject.LoadAsync(new JsonTextReader(reader)).ConfigureAwait(false);
 		}
 	}
 }

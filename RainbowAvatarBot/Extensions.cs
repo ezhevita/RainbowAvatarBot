@@ -20,7 +20,7 @@ namespace RainbowAvatarBot {
 
 		internal static async Task<MemoryStream> SaveToPng(this Image image) {
 			MemoryStream stream = new();
-			await image.SaveAsPngAsync(stream, PngEncoder);
+			await image.SaveAsPngAsync(stream, PngEncoder).ConfigureAwait(false);
 			stream.Position = 0;
 			return stream;
 		}
