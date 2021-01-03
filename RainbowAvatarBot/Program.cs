@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,6 +12,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using ICSharpCode.SharpZipLib.GZip;
+using Microsoft.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp;
@@ -32,7 +34,7 @@ namespace RainbowAvatarBot {
 		private static readonly Dictionary<string, Image> Images = new();
 
 		private static readonly ResultCache ResultCache = new();
-
+		private static readonly RecyclableMemoryStreamManager MemoryStreamManager = new();
 		private static readonly SemaphoreSlim FileSemaphore = new(1, 1);
 		private static readonly Timer ClearUsersTimer = new(_ => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new();
@@ -415,8 +417,8 @@ namespace RainbowAvatarBot {
 		}
 
 		private static async Task<Stream> PackAnimatedSticker(JToken content) {
-			await using MemoryStream memoryStream = new();
-			MemoryStream resultStream = new();
+			await using MemoryStream memoryStream = MemoryStreamManager.GetStream("IntermediateForAnimatedSticker", 640 * 1024);
+			MemoryStream resultStream = MemoryStreamManager.GetStream("ResultForAnimatedSticker", 64 * 1024);
 
 			await using (StreamWriter streamWriter = new(memoryStream, leaveOpen: true))
 			using (JsonTextWriter jsonTextWriter = new(streamWriter) {
@@ -429,22 +431,34 @@ namespace RainbowAvatarBot {
 
 			memoryStream.Position = 0;
 
-			GZip.Compress(memoryStream, resultStream, false, 4096, 9);
-			resultStream.Position = 0;
+			await using (GZipOutputStream gzipOutput = new(resultStream)) {
+				gzipOutput.SetLevel(9);
+				gzipOutput.IsStreamOwner = false;
+				await memoryStream.CopyToAsync(gzipOutput).ConfigureAwait(false);
+			}
 
+			resultStream.Position = 0;
 			return resultStream;
 		}
 
 		private static async Task ProcessAndSend(string imageID, string imageUniqueID, string overlayName, Message message) {
-			MediaType mediaType = message.Type == MessageType.Sticker ? message.Sticker.IsAnimated ? MediaType.AnimatedSticker : MediaType.Sticker : MediaType.Picture;
+			MediaType mediaType = message.Type switch {
+				MessageType.Sticker when message.Sticker.IsAnimated => MediaType.AnimatedSticker,
+				MessageType.Sticker => MediaType.Sticker,
+				MessageType.Photo => MediaType.Picture,
+				_ => throw new ArgumentOutOfRangeException(nameof(message))
+			};
+
 			Log(message.From.Id + "|" + mediaType + "|" + imageID);
 
 			bool isSticker = message.Type == MessageType.Sticker;
 
 			Stopwatch sw = null;
+			Stream resultStream = null;
+			Message processMessage = null;
+
 			bool isCached;
 			InputMedia resultImage;
-			Message processMessage = null;
 			// ReSharper disable once AssignmentInConditionalExpression
 			if (isCached = ResultCache.TryGetValue(imageUniqueID, overlayName, out string cachedResultImageID)) {
 				resultImage = cachedResultImageID;
@@ -461,11 +475,24 @@ namespace RainbowAvatarBot {
 
 				processMessage = await BotClient.SendTextMessageAsync(message.Chat.Id, Localization.Processing).ConfigureAwait(false);
 				sw = Stopwatch.StartNew();
-				resultImage = await ProcessImage(imageID, overlayName, mediaType).ConfigureAwait(false);
+				resultStream = await ProcessImage(imageID, overlayName, mediaType).ConfigureAwait(false);
+				resultImage = new InputMedia(resultStream, mediaType switch {
+					MediaType.Picture => "picture.png",
+					MediaType.Sticker => "sticker.png",
+					MediaType.AnimatedSticker => "sticker.tgs",
+					_ => throw new ArgumentOutOfRangeException(nameof(message))
+				});
 			}
 
-			Message resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : 
-				await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
+			Message resultMessage;
+			try {
+				resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : 
+					await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
+			} finally {
+				if (resultStream != null) {
+					await resultStream.DisposeAsync().ConfigureAwait(false);
+				}
+			}
 
 			if (sw != null) {
 				sw.Stop();
@@ -490,33 +517,54 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		private static async Task<InputMedia> ProcessImage(string fileId, string overlayName, MediaType mediaType) {
+		private static async Task<Stream> ProcessImage(string fileId, string overlayName, MediaType mediaType) {
 			(Stream Result, long Length) fileData = await DownloadFile(fileId).ConfigureAwait(false);
 			await using Stream file = fileData.Result;
 
 			if (mediaType == MediaType.AnimatedSticker) {
 				JObject stickerObject = await UnpackAnimatedSticker(file).ConfigureAwait(false);
 				JObject processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
-				InputMedia inputMediaAnimated = new(await PackAnimatedSticker(processedAnimation).ConfigureAwait(false), "sticker.tgs");
-				return inputMediaAnimated;
+				return await PackAnimatedSticker(processedAnimation).ConfigureAwait(false);
 			}
 
-			Image image;
+			MemoryStream result;
 			if (mediaType == MediaType.Sticker) {
-				await using MemoryStream memoryStream = new((int) fileData.Length);
-				await file.CopyToAsync(memoryStream).ConfigureAwait(false);
+				byte[] fileArray = ArrayPool<byte>.Shared.Rent((int) fileData.Length);
 
-				byte[] fileArray = memoryStream.ToArray();
-				(int width, int height) = WebPDecoder.GetWebPInfo(fileArray);
+				try {
+					await using (MemoryStream memoryStream = new(fileArray)) {
+						await file.CopyToAsync(memoryStream).ConfigureAwait(false);
+					}
 
-				image = Image.WrapMemory<Argb32>(WebPDecoder.DecodeFromBytes(memoryStream.ToArray(), width, height), width, height);
+					(int width, int height) = WebPDecoder.GetWebPInfo(fileArray, (uint) fileData.Length);
+
+					int rawLength = width * height * 4;
+					byte[] outputArray = ArrayPool<byte>.Shared.Rent(rawLength);
+
+					try {
+						WebPDecoder.DecodeFromBytes(fileArray, (uint) fileData.Length, outputArray, (uint) rawLength, width);
+
+						Memory<byte> memoryToWrap = outputArray.AsMemory(0, rawLength);
+						Image<Argb32> image = Image.WrapMemory<Argb32>(memoryToWrap, width, height);
+						image.Overlay(Images[overlayName]);
+
+						result = MemoryStreamManager.GetStream("ResultStickerStream", 1 * 1024 * 1024);
+						await image.SaveToPng(result).ConfigureAwait(false);
+					} finally {
+						ArrayPool<byte>.Shared.Return(outputArray);
+					}
+				} finally {
+					ArrayPool<byte>.Shared.Return(fileArray);
+				}
 			} else {
-				image = await Image.LoadAsync(file).ConfigureAwait(false);
+				Image image = await Image.LoadAsync(file).ConfigureAwait(false);
+				image.Overlay(Images[overlayName]);
+
+				result = MemoryStreamManager.GetStream("ResultPictureStream", 1 * 1024 * 1024);
+				await image.SaveToPng(result).ConfigureAwait(false);
 			}
 
-			image.Overlay(Images[overlayName]);
-			InputMedia inputMedia = new(await image.SaveToPng().ConfigureAwait(false), "image.png");
-			return inputMedia;
+			return result;
 		}
 
 		private static JObject ProcessLottieAnimation(JObject tokenizedSticker, string overlayName) {

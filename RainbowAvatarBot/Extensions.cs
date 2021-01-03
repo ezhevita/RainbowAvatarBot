@@ -18,11 +18,9 @@ namespace RainbowAvatarBot {
 			sourceImage.Mutate(img => img.DrawImage(resized, PixelColorBlendingMode.HardLight, PixelAlphaCompositionMode.SrcAtop, 0.5f));
 		}
 
-		internal static async Task<MemoryStream> SaveToPng(this Image image) {
-			MemoryStream stream = new();
-			await image.SaveAsPngAsync(stream, PngEncoder).ConfigureAwait(false);
-			stream.Position = 0;
-			return stream;
+		internal static async Task SaveToPng(this Image image, Stream streamToWrite) {
+			await image.SaveAsPngAsync(streamToWrite, PngEncoder).ConfigureAwait(false);
+			streamToWrite.Position = 0;
 		}
 	}
 }

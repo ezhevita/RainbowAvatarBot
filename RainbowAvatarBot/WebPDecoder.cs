@@ -3,30 +3,25 @@ using Imazen.WebP.Extern;
 
 namespace RainbowAvatarBot {
 	public static class WebPDecoder {
-		public static unsafe byte[] DecodeFromBytes(byte[] data, int w, int h) {
-			fixed (byte* dataptr = data) {
-				return DecodeFromPointer((IntPtr) dataptr, data.Length, w, h);
-			}
-		}
-
-		private static unsafe byte[] DecodeFromPointer(IntPtr data, long length, int w, int h) {
-			byte[] output = new byte[w * h * 4];
+		public static unsafe void DecodeFromBytes(byte[] data, uint dataLength, byte[] output, uint outputLength, int w) {
+			fixed (byte* dataptr = data)
 			fixed (byte* outputptr = output) {
-				IntPtr pointer = (IntPtr) outputptr;
-				//Decode to surface
-				IntPtr result = NativeMethods.WebPDecodeARGBInto(data, (UIntPtr) length, pointer, (UIntPtr) output.Length, w * 4);
-				if ((IntPtr) outputptr != result) {
-					throw new Exception("Failed to decode WebP image with error " + (long) result);
-				}
+				DecodeFromPointer((IntPtr) dataptr, dataLength, (IntPtr) outputptr, outputLength, w);
 			}
-
-			return output;
 		}
 
-		public static unsafe (int w, int h) GetWebPInfo(byte[] data) {
+		private static void DecodeFromPointer(IntPtr data, uint length, IntPtr output, uint outputLength, int w) {
+			//Decode to surface
+			IntPtr result = NativeMethods.WebPDecodeARGBInto(data, (UIntPtr) length, output, (UIntPtr) outputLength, w * 4);
+			if (output != result) {
+				throw new Exception("Failed to decode WebP image with error " + (long) result);
+			}
+		}
+
+		public static unsafe (int w, int h) GetWebPInfo(byte[] data, uint length) {
 			fixed (byte* dataptr = data) {
 				int w = 0, h = 0;
-				if (NativeMethods.WebPGetInfo((IntPtr) dataptr, (UIntPtr) data.Length, ref w, ref h) == 0) {
+				if (NativeMethods.WebPGetInfo((IntPtr) dataptr, (UIntPtr) length, ref w, ref h) == 0) {
 					throw new Exception("Invalid WebP header detected");
 				}
 
