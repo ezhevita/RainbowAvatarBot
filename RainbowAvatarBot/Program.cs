@@ -445,8 +445,7 @@ namespace RainbowAvatarBot {
 			MediaType mediaType = message.Type switch {
 				MessageType.Sticker when message.Sticker.IsAnimated => MediaType.AnimatedSticker,
 				MessageType.Sticker => MediaType.Sticker,
-				MessageType.Photo => MediaType.Picture,
-				_ => throw new ArgumentOutOfRangeException(nameof(message))
+				_ => MediaType.Picture
 			};
 
 			Log(message.From.Id + "|" + mediaType + "|" + imageID);
