@@ -1,12 +1,6 @@
 using System;
-using System.Buffers;
-using System.Drawing;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using Imazen.WebP;
 using Imazen.WebP.Extern;
-using SixLabors.ImageSharp.Formats.Png;
 
 namespace RainbowAvatarBot {
 	public static class WebPConverter {
@@ -21,17 +15,6 @@ namespace RainbowAvatarBot {
 			IntPtr result = NativeMethods.WebPDecodeRGBAInto(data, (UIntPtr) length, output, (UIntPtr) outputLength, w * 4);
 			if (output != result) {
 				throw new Exception("Failed to decode WebP image with error " + (long) result);
-			}
-		}
-
-		public static unsafe (int w, int h) GetWebPInfo(byte[] data, uint length) {
-			fixed (byte* dataptr = data) {
-				int w = 0, h = 0;
-				if (NativeMethods.WebPGetInfo((IntPtr) dataptr, (UIntPtr) length, ref w, ref h) == 0) {
-					throw new Exception("Invalid WebP header detected");
-				}
-
-				return (w, h);
 			}
 		}
 
@@ -53,6 +36,17 @@ namespace RainbowAvatarBot {
 
 		private static void EncodeFromPointer(IntPtr data, int w, int h, ref IntPtr result, out uint length) {
 			length = (uint) NativeMethods.WebPEncodeLosslessRGBA(data, w, h, w * 4, ref result);
+		}
+
+		public static unsafe (int w, int h) GetWebPInfo(byte[] data, uint length) {
+			fixed (byte* dataptr = data) {
+				int w = 0, h = 0;
+				if (NativeMethods.WebPGetInfo((IntPtr) dataptr, (UIntPtr) length, ref w, ref h) == 0) {
+					throw new Exception("Invalid WebP header detected");
+				}
+
+				return (w, h);
+			}
 		}
 	}
 }

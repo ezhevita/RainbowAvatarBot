@@ -38,7 +38,7 @@ namespace RainbowAvatarBot {
 		private static readonly SemaphoreSlim FileSemaphore = new(1, 1);
 		private static readonly Timer ClearUsersTimer = new(_ => ClearUsers(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 		private static readonly ConcurrentDictionary<int, DateTime> LastUserImageGenerations = new();
-		private static readonly Timer ResetTimer = new(_ => ResultCache.Reset(), null, TimeSpan.FromDays(1), TimeSpan.FromDays(1));
+		private static readonly Timer ResetTimer = new(_ => ResultCache.Reset(), null, TimeSpan.FromDays(7), TimeSpan.FromDays(7));
 		private static readonly SemaphoreSlim ShutdownSemaphore = new(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
 
@@ -486,8 +486,7 @@ namespace RainbowAvatarBot {
 
 			Message resultMessage;
 			try {
-				resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : 
-					await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
+				resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
 			} finally {
 				if (resultStream != null) {
 					await resultStream.DisposeAsync().ConfigureAwait(false);
@@ -498,7 +497,7 @@ namespace RainbowAvatarBot {
 				sw.Stop();
 				Log($"Processed {mediaType} in {sw.ElapsedMilliseconds}ms");
 			}
-			
+
 			if (processMessage != null) {
 				#pragma warning disable 4014
 				BotClient.DeleteMessageAsync(processMessage.Chat.Id, processMessage.MessageId);
@@ -512,8 +511,7 @@ namespace RainbowAvatarBot {
 			}
 
 			if (!isCached) {
-				ResultCache.TryAdd(imageUniqueID, overlayName, isSticker ? resultMessage.Sticker.FileId : 
-					resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
+				ResultCache.TryAdd(imageUniqueID, overlayName, isSticker ? resultMessage.Sticker.FileId : resultMessage.Photo.OrderByDescending(photo => photo.Height).First().FileId);
 			}
 		}
 
@@ -552,7 +550,7 @@ namespace RainbowAvatarBot {
 						try {
 							WebPConverter.EncodeFromBytes(outputArray, encodedArray, width, height, out uint length);
 							result = MemoryStreamManager.GetStream("ResultStickerStream", (int) length);
-							await result.WriteAsync(encodedArray.AsMemory(0, (int)length)).ConfigureAwait(false);
+							await result.WriteAsync(encodedArray.AsMemory(0, (int) length)).ConfigureAwait(false);
 
 							result.Position = 0;
 						} finally {
