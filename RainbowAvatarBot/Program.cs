@@ -478,7 +478,7 @@ namespace RainbowAvatarBot {
 				resultStream = await ProcessImage(imageID, overlayName, mediaType).ConfigureAwait(false);
 				resultImage = new InputMedia(resultStream, mediaType switch {
 					MediaType.Picture => "picture.png",
-					MediaType.Sticker => "sticker.png",
+					MediaType.Sticker => "sticker.webp",
 					MediaType.AnimatedSticker => "sticker.tgs",
 					_ => throw new ArgumentOutOfRangeException(nameof(message))
 				});
@@ -536,20 +536,28 @@ namespace RainbowAvatarBot {
 						await file.CopyToAsync(memoryStream).ConfigureAwait(false);
 					}
 
-					(int width, int height) = WebPDecoder.GetWebPInfo(fileArray, (uint) fileData.Length);
+					(int width, int height) = WebPConverter.GetWebPInfo(fileArray, (uint) fileData.Length);
 
 					int rawLength = width * height * 4;
 					byte[] outputArray = ArrayPool<byte>.Shared.Rent(rawLength);
 
 					try {
-						WebPDecoder.DecodeFromBytes(fileArray, (uint) fileData.Length, outputArray, (uint) rawLength, width);
+						WebPConverter.DecodeFromBytes(fileArray, (uint) fileData.Length, outputArray, (uint) rawLength, width);
 
 						Memory<byte> memoryToWrap = outputArray.AsMemory(0, rawLength);
-						Image<Argb32> image = Image.WrapMemory<Argb32>(memoryToWrap, width, height);
+						Image<Rgba32> image = Image.WrapMemory<Rgba32>(memoryToWrap, width, height);
 						image.Overlay(Images[overlayName]);
 
-						result = MemoryStreamManager.GetStream("ResultStickerStream", 1 * 1024 * 1024);
-						await image.SaveToPng(result).ConfigureAwait(false);
+						byte[] encodedArray = ArrayPool<byte>.Shared.Rent(128 * 1024);
+						try {
+							WebPConverter.EncodeFromBytes(outputArray, encodedArray, width, height, out uint length);
+							result = MemoryStreamManager.GetStream("ResultStickerStream", (int) length);
+							await result.WriteAsync(encodedArray.AsMemory(0, (int)length)).ConfigureAwait(false);
+
+							result.Position = 0;
+						} finally {
+							ArrayPool<byte>.Shared.Return(encodedArray);
+						}
 					} finally {
 						ArrayPool<byte>.Shared.Return(outputArray);
 					}
