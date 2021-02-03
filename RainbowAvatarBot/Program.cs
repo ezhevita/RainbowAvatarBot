@@ -545,15 +545,17 @@ namespace RainbowAvatarBot {
 						Image<Rgba32> image = Image.WrapMemory<Rgba32>(memoryToWrap, width, height);
 						image.Overlay(Images[overlayName]);
 
-						byte[] encodedArray = ArrayPool<byte>.Shared.Rent(128 * 1024);
+						byte[] encodedArray = null;
 						try {
-							WebPConverter.EncodeFromBytes(outputArray, encodedArray, width, height, out uint length);
+							encodedArray = WebPConverter.EncodeFromBytes(outputArray, width, height, out uint length);
 							result = MemoryStreamManager.GetStream("ResultStickerStream", (int) length);
 							await result.WriteAsync(encodedArray.AsMemory(0, (int) length)).ConfigureAwait(false);
 
 							result.Position = 0;
 						} finally {
-							ArrayPool<byte>.Shared.Return(encodedArray);
+							if (encodedArray != null) {
+								ArrayPool<byte>.Shared.Return(encodedArray);
+							}
 						}
 					} finally {
 						ArrayPool<byte>.Shared.Return(outputArray);

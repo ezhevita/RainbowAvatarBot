@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Runtime.InteropServices;
 using Imazen.WebP.Extern;
 
@@ -18,7 +19,7 @@ namespace RainbowAvatarBot {
 			}
 		}
 
-		public static unsafe void EncodeFromBytes(byte[] data, byte[] output, int w, int h, out uint length) {
+		public static unsafe byte[] EncodeFromBytes(byte[] data, int w, int h, out uint length) {
 			fixed (byte* dataptr = data) {
 				IntPtr result = IntPtr.Zero;
 				try {
@@ -27,7 +28,10 @@ namespace RainbowAvatarBot {
 						throw new Exception("WebP encode failed!");
 					}
 
+					var output = ArrayPool<byte>.Shared.Rent((int) length);
 					Marshal.Copy(result, output, 0, (int) length);
+
+					return output;
 				} finally {
 					NativeMethods.WebPSafeFree(result);
 				}
