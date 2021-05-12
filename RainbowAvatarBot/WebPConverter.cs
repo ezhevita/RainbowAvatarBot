@@ -28,7 +28,7 @@ namespace RainbowAvatarBot {
 						throw new Exception("WebP encode failed!");
 					}
 
-					var output = ArrayPool<byte>.Shared.Rent((int) length);
+					byte[] output = ArrayPool<byte>.Shared.Rent((int) length);
 					Marshal.Copy(result, output, 0, (int) length);
 
 					return output;

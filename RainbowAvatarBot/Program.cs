@@ -42,7 +42,7 @@ namespace RainbowAvatarBot {
 		private static readonly SemaphoreSlim ShutdownSemaphore = new(0, 1);
 		private static readonly DateTime StartedTime = DateTime.UtcNow;
 
-		private static readonly HashSet<MessageType> SupportedTypes = new(3) {
+		private static readonly HashSet<MessageType> SupportedTypes = new(2) {
 			MessageType.Photo,
 			MessageType.Sticker
 		};
@@ -115,16 +115,17 @@ namespace RainbowAvatarBot {
 
 			if (!string.IsNullOrEmpty(textMessage) && (textMessage[0] == '/')) {
 				string argumentToProcess = textMessage.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
-				if (argumentToProcess.Contains('@')) {
-					if (argumentToProcess.Substring(argumentToProcess.IndexOf('@') + 1) != BotUsername) {
+				var indexOfAt = argumentToProcess.IndexOf('@');
+				if (indexOfAt > 0) {
+					if (argumentToProcess[(indexOfAt + 1)..] != BotUsername) {
 						return;
 					}
 
-					argumentToProcess = argumentToProcess.Split('@')[0];
+					argumentToProcess = argumentToProcess[..indexOfAt];
 				}
 
 				args = argumentToProcess.Split('_', ',');
-				args[0] = args[0].Substring(1);
+				args[0] = args[0][1..];
 			} else if (e.Message.Chat.Type != ChatType.Private) {
 				return;
 			}
@@ -163,7 +164,7 @@ namespace RainbowAvatarBot {
 							break;
 						}
 
-						case "COLORIZE" when (e.Message.ReplyToMessage?.Type == MessageType.Photo) || (e.Message.ReplyToMessage?.Type == MessageType.Sticker): {
+						case "COLORIZE" when e.Message.ReplyToMessage?.Type is MessageType.Photo or MessageType.Sticker: {
 							if (!UserSettings.TryGetValue(senderID, out string overlayName)) {
 								overlayName = "LGBT";
 							}
@@ -185,7 +186,7 @@ namespace RainbowAvatarBot {
 							break;
 						}
 
-						case "SETTINGS" when (e.Message.Chat.Type == ChatType.Group) || (e.Message.Chat.Type == ChatType.Supergroup): {
+						case "SETTINGS" when e.Message.Chat.Type is ChatType.Group or ChatType.Supergroup: {
 							await BotClient.SendTextMessageAsync(chatID, Localization.SettingsSentToChat, replyToMessageId: e.Message.MessageId).ConfigureAwait(false);
 							break;
 						}
@@ -281,11 +282,11 @@ namespace RainbowAvatarBot {
 				}
 
 				if (index > 0) {
-					FillLine((byte) ((index * 2 - 1) * 4), 0);
+					FillLine((byte) ((index << 3) - 4), 0);
 				}
 
 				if (index < rgbValues.Count - 1) {
-					FillLine((byte) (index * 2 * 4), 1);
+					FillLine((byte) (index << 3), 1);
 				}
 
 				index++;
@@ -386,8 +387,8 @@ namespace RainbowAvatarBot {
 
 			// Using Newtonsoft.Json because System.Text.Json doesn't support JSON5 format (and hexadicimal numbers)
 			Flags = JsonConvert.DeserializeObject<Dictionary<string, uint[]>>(await File.ReadAllTextAsync("flags.json").ConfigureAwait(false))
-			                   .Where(name => !File.Exists(Path.Join("images", name + ".png")))
-			                   .ToDictionary(x => x.Key, y => y.Value);
+				.Where(name => !File.Exists(Path.Join("images", name + ".png")))
+				.ToDictionary(x => x.Key, y => y.Value);
 
 			IEnumerable<string> existFiles = Directory.EnumerateFiles("images", "*.png").Select(Path.GetFileNameWithoutExtension);
 			if (Flags.Keys.Any(name => !existFiles.Contains(name))) {
