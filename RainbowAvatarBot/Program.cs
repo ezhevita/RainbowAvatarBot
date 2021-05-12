@@ -485,7 +485,7 @@ namespace RainbowAvatarBot {
 
 			Message resultMessage;
 			try {
-				resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage).ConfigureAwait(false) : await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.ReplyToMessage?.MessageId ?? message.MessageId).ConfigureAwait(false);
+				resultMessage = isSticker ? await BotClient.SendStickerAsync(message.Chat.Id, resultImage, replyToMessageId: message.MessageId).ConfigureAwait(false) : await BotClient.SendPhotoAsync(message.Chat.Id, resultImage, replyToMessageId: message.MessageId).ConfigureAwait(false);
 			} finally {
 				if (resultStream != null) {
 					await resultStream.DisposeAsync().ConfigureAwait(false);
