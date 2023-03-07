@@ -329,8 +329,8 @@ namespace RainbowAvatarBot {
 			}
 
 			Log("Starting " + nameof(RainbowAvatarBot));
-			var token = await File.ReadAllTextAsync("data/token.txt").ConfigureAwait(false);
-			BotClient = new TelegramBotClient(token.Trim());
+			var token = (await File.ReadAllTextAsync("data/token.txt").ConfigureAwait(false)).Trim();
+			BotClient = new TelegramBotClient(token);
 			if (!await BotClient.TestApiAsync().ConfigureAwait(false)) {
 				Log("Error when starting bot!");
 				return;
@@ -540,7 +540,14 @@ namespace RainbowAvatarBot {
 			image.Overlay(Images[overlayName]);
 
 			var result = MemoryStreamManager.GetStream("ResultPictureStream", 1 * 1024 * 1024);
-			await image.SaveToPng(result).ConfigureAwait(false);
+			if (mediaType == MediaType.Picture)
+			{
+				await image.SaveToPng(result).ConfigureAwait(false);
+			} else
+			{
+				await image.SaveAsWebpAsync(result).ConfigureAwait(false);
+				result.Position = 0;
+			}
 
 			return result;
 		}
