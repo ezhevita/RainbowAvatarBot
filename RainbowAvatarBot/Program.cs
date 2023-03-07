@@ -88,7 +88,7 @@ namespace RainbowAvatarBot {
 
 					await FileSemaphore.WaitAsync().ConfigureAwait(false);
 					try {
-						await using var configFile = File.OpenWrite("config.json");
+						await using var configFile = File.OpenWrite("data/config.json");
 						await JsonSerializer.SerializeAsync(configFile, UserSettings).ConfigureAwait(false);
 						await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, Localization.ChangedSuccessfully, replyMarkup: InlineKeyboardMarkup.Empty()).ConfigureAwait(false);
 						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success).ConfigureAwait(false);
@@ -320,17 +320,16 @@ namespace RainbowAvatarBot {
 		private static void Log(string strToLog) {
 			var result = $"{DateTime.UtcNow}|{strToLog}";
 			Console.WriteLine(result);
-			File.AppendAllText("log.txt", result + Environment.NewLine);
 		}
 
 		private static async Task Main() {
-			if (File.Exists("config.json")) {
-				await using var configFile = File.OpenRead("config.json");
+			if (File.Exists("data/config.json")) {
+				await using var configFile = File.OpenRead("data/config.json");
 				UserSettings = await JsonSerializer.DeserializeAsync<ConcurrentDictionary<long, string>>(configFile).ConfigureAwait(false);
 			}
 
 			Log("Starting " + nameof(RainbowAvatarBot));
-			var token = await File.ReadAllTextAsync("token.txt").ConfigureAwait(false);
+			var token = await File.ReadAllTextAsync("data/token.txt").ConfigureAwait(false);
 			BotClient = new TelegramBotClient(token);
 			if (!await BotClient.TestApiAsync().ConfigureAwait(false)) {
 				Log("Error when starting bot!");

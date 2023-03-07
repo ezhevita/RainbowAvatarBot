@@ -1,0 +1,9 @@
+.dockerignore
+.git
+.github
+.idea
+*.DotSettings.user
+Dockerfile
+**/.DS_Store
+**/bin/
+**/obj/
