@@ -322,7 +322,20 @@ namespace RainbowAvatarBot {
 			Console.WriteLine(result);
 		}
 
-		private static async Task Main() {
+		private static async Task Main()
+		{
+			try
+			{
+				await Init();
+			} catch (Exception e)
+			{
+				Console.WriteLine(e);
+
+				throw;
+			}
+		}
+
+		private static async Task Init() {
 			if (File.Exists("data/config.json")) {
 				await using var configFile = File.OpenRead("data/config.json");
 				UserSettings = await JsonSerializer.DeserializeAsync<ConcurrentDictionary<long, string>>(configFile).ConfigureAwait(false);
