@@ -13,7 +13,7 @@ namespace RainbowAvatarBot {
 		};
 
 		internal static void Overlay(this Image sourceImage, Image overlayImage) {
-			using Image resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height, new NearestNeighborResampler()));
+			using var resized = overlayImage.Clone(img => img.Resize(sourceImage.Width, sourceImage.Height, new NearestNeighborResampler()));
 			// ReSharper disable once AccessToDisposedClosure
 			sourceImage.Mutate(img => img.DrawImage(resized, PixelColorBlendingMode.HardLight, PixelAlphaCompositionMode.SrcAtop, 0.5f));
 		}
