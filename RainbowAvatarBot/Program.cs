@@ -88,8 +88,8 @@ namespace RainbowAvatarBot {
 
 					await FileSemaphore.WaitAsync().ConfigureAwait(false);
 					try {
-						await using var configFile = File.OpenWrite("data/config.json");
-						await JsonSerializer.SerializeAsync(configFile, UserSettings).ConfigureAwait(false);
+						var settings = JsonSerializer.Serialize(UserSettings);
+						await File.WriteAllTextAsync("data/config.json", settings);
 						await BotClient.EditMessageTextAsync(message.Chat.Id, message.MessageId, Localization.ChangedSuccessfully, replyMarkup: InlineKeyboardMarkup.Empty()).ConfigureAwait(false);
 						await BotClient.AnswerCallbackQueryAsync(callbackID, Localization.Success).ConfigureAwait(false);
 					} finally {
