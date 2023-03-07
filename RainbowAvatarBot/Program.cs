@@ -330,7 +330,7 @@ namespace RainbowAvatarBot {
 
 			Log("Starting " + nameof(RainbowAvatarBot));
 			var token = await File.ReadAllTextAsync("data/token.txt").ConfigureAwait(false);
-			BotClient = new TelegramBotClient(token);
+			BotClient = new TelegramBotClient(token.Trim());
 			if (!await BotClient.TestApiAsync().ConfigureAwait(false)) {
 				Log("Error when starting bot!");
 				return;

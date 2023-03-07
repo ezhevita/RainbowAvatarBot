@@ -15,7 +15,7 @@
 		<PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.3.2" />
 		<PackageReference Include="SharpZipLib" Version="1.4.2" />
 		<PackageReference Include="SixLabors.ImageSharp" Version="3.0.0" />
-		<PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta11" />
+		<PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
 		<PackageReference Include="Telegram.Bot" Version="18.0.0" />
 	</ItemGroup>
 	
