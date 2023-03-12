@@ -545,7 +545,7 @@ public sealed class Bot : IDisposable
 		if (sw != null)
 		{
 			sw.Stop();
-			_logger.LogDebug("Processed {MediaType} in {ElapsedMilliseconds}ms", mediaType, sw.ElapsedMilliseconds);
+			_logger.LogInformation("Processed {MediaType} in {ElapsedMilliseconds}ms", mediaType, sw.ElapsedMilliseconds);
 		}
 
 		if (processMessage != null)
