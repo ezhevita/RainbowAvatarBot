@@ -1,6 +1,8 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using FFMpegCore;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -29,4 +31,12 @@ internal static class Extensions
 
 	internal static Task SaveToPng(this Image image, Stream streamToWrite, CancellationToken cancellationToken = default) =>
 		image.SaveAsPngAsync(streamToWrite, PngEncoder, cancellationToken);
+
+	public static FFMpegArgumentOptions WithOverlayVideoFilter(this FFMpegArgumentOptions ffMpegArgumentOptions,
+		Action<OverlayVideoFilterArgumentOptions> overlayOptions)
+	{
+		var options = new OverlayVideoFilterArgumentOptions();
+		overlayOptions(options);
+		return ffMpegArgumentOptions.WithArgument(new OverlayVideoFilterArgument(options));
+	}
 }

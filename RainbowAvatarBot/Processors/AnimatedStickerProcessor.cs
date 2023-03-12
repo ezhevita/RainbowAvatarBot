@@ -14,6 +14,13 @@ namespace RainbowAvatarBot.Processors;
 
 public class AnimatedStickerProcessor : IProcessor
 {
+	private static JObject _gradientOverlay;
+	private static JObject _referenceObject;
+	private static IReadOnlyDictionary<string, float[]> _flagGradients;
+	private static IReadOnlyDictionary<string, int> _colorsCount;
+
+	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
+
 	public AnimatedStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager, AnimatedStickerHelperData helperData)
 	{
 		_memoryStreamManager = memoryStreamManager;
@@ -21,11 +28,33 @@ public class AnimatedStickerProcessor : IProcessor
 		_referenceObject = helperData.ReferenceObject;
 	}
 
-	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
-	private static JObject _gradientOverlay;
-	private static JObject _referenceObject;
-	private static IReadOnlyDictionary<string, float[]> _flagGradients;
-	private static IReadOnlyDictionary<string, int> _colorsCount;
+	public bool CanProcessMediaType(MediaType mediaType) => mediaType == MediaType.AnimatedSticker;
+
+	public async Task<InputMedia> Process(Stream input, string overlayName, MediaType mediaType)
+	{
+		JObject stickerObject;
+		await using (GZipStream gzStream = new(input, CompressionMode.Decompress))
+		{
+			using StreamReader reader = new(gzStream);
+			using JsonTextReader jsonReader = new(reader);
+
+			stickerObject = await JObject.LoadAsync(jsonReader).ConfigureAwait(false);
+		}
+
+		var processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
+
+		var result = await PackAnimatedSticker(processedAnimation).ConfigureAwait(false);
+
+		return new InputMedia(result, "sticker.tgs");
+	}
+
+	public Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData)
+	{
+		_flagGradients = flagsData.ToDictionary(x => x.Key, x => GenerateGradient(x.Value));
+		_colorsCount = flagsData.ToDictionary(x => x.Key, x => x.Value.Count);
+
+		return Task.CompletedTask;
+	}
 
 	private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues)
 	{
@@ -57,32 +86,34 @@ public class AnimatedStickerProcessor : IProcessor
 		return gradientProps;
 	}
 
-	public bool CanProcessMediaType(MediaType mediaType) => mediaType == MediaType.AnimatedSticker;
-
-	public async Task<InputMedia> Process(Stream input, string overlayName, MediaType mediaType)
+	private async Task<Stream> PackAnimatedSticker(JToken content)
 	{
-		JObject stickerObject;
-		await using (GZipStream gzStream = new(input, CompressionMode.Decompress))
-		{
-			using StreamReader reader = new(gzStream);
-			using JsonTextReader jsonReader = new(reader);
+		await using var memoryStream = _memoryStreamManager.GetStream("IntermediateForAnimatedSticker", 640 * 1024);
+		var resultStream = _memoryStreamManager.GetStream("ResultForAnimatedSticker", 64 * 1024);
 
-			stickerObject = await JObject.LoadAsync(jsonReader).ConfigureAwait(false);
+		await using (StreamWriter streamWriter = new(memoryStream, leaveOpen: true))
+		using (JsonTextWriter jsonTextWriter = new(streamWriter)
+		       {
+			       Formatting = Formatting.None,
+			       AutoCompleteOnClose = true,
+			       CloseOutput = false
+		       })
+		{
+			await content.WriteToAsync(jsonTextWriter).ConfigureAwait(false);
 		}
 
-		var processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
+		memoryStream.Position = 0;
 
-		var result = await PackAnimatedSticker(processedAnimation).ConfigureAwait(false);
+		await using (GZipOutputStream gzipOutput = new(resultStream))
+		{
+			gzipOutput.SetLevel(9);
+			gzipOutput.IsStreamOwner = false;
+			await memoryStream.CopyToAsync(gzipOutput).ConfigureAwait(false);
+		}
 
-		return new InputMedia(result, "sticker.tgs");
-	}
+		resultStream.Position = 0;
 
-	public Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData)
-	{
-		_flagGradients = flagsData.ToDictionary(x => x.Key, x => GenerateGradient(x.Value));
-		_colorsCount = flagsData.ToDictionary(x => x.Key, x => x.Value.Count);
-
-		return Task.CompletedTask;
+		return resultStream;
 	}
 
 	private static JObject ProcessLottieAnimation(JObject tokenizedSticker, string overlayName)
@@ -126,35 +157,5 @@ public class AnimatedStickerProcessor : IProcessor
 		layersToken.Add(clonedReferenceObject);
 
 		return tokenizedSticker;
-	}
-
-	private async Task<Stream> PackAnimatedSticker(JToken content)
-	{
-		await using var memoryStream = _memoryStreamManager.GetStream("IntermediateForAnimatedSticker", 640 * 1024);
-		var resultStream = _memoryStreamManager.GetStream("ResultForAnimatedSticker", 64 * 1024);
-
-		await using (StreamWriter streamWriter = new(memoryStream, leaveOpen: true))
-		using (JsonTextWriter jsonTextWriter = new(streamWriter)
-		       {
-			       Formatting = Formatting.None,
-			       AutoCompleteOnClose = true,
-			       CloseOutput = false
-		       })
-		{
-			await content.WriteToAsync(jsonTextWriter).ConfigureAwait(false);
-		}
-
-		memoryStream.Position = 0;
-
-		await using (GZipOutputStream gzipOutput = new(resultStream))
-		{
-			gzipOutput.SetLevel(9);
-			gzipOutput.IsStreamOwner = false;
-			await memoryStream.CopyToAsync(gzipOutput).ConfigureAwait(false);
-		}
-
-		resultStream.Position = 0;
-
-		return resultStream;
 	}
 }

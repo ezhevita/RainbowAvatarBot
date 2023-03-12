@@ -15,13 +15,10 @@ namespace RainbowAvatarBot.Processors;
 
 public class ImageProcessor : IProcessor
 {
-	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
 	private readonly Dictionary<string, Image> _images = new();
+	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
 
-	public ImageProcessor(RecyclableMemoryStreamManager memoryStreamManager)
-	{
-		_memoryStreamManager = memoryStreamManager;
-	}
+	public ImageProcessor(RecyclableMemoryStreamManager memoryStreamManager) => _memoryStreamManager = memoryStreamManager;
 
 	public async Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData)
 	{
@@ -39,26 +36,6 @@ public class ImageProcessor : IProcessor
 		{
 			_images.Add(name, image);
 		}
-	}
-
-	private static async Task GenerateImage(string name, IReadOnlyCollection<uint> colors)
-	{
-		using Image<Rgba32> image = new(1, colors.Count);
-		byte index = 0;
-		foreach (var color in colors)
-		{
-			var indexCopy = index;
-
-			image.Mutate(
-				img => img.Fill(
-					new Argb32((byte) (color >> 16), (byte) ((color >> 8) & 0xFF), (byte) (color & 0xFF)),
-					new RectangleF(0, indexCopy, 1, 1)
-				)
-			);
-			index++;
-		}
-
-		await image.SaveAsPngAsync(Path.Join("images", name + ".png"));
 	}
 
 	public bool CanProcessMediaType(MediaType mediaType) => mediaType is MediaType.Picture or MediaType.Sticker;
@@ -87,5 +64,25 @@ public class ImageProcessor : IProcessor
 		};
 
 		return new InputMedia(result, fileName);
+	}
+
+	private static async Task GenerateImage(string name, IReadOnlyCollection<uint> colors)
+	{
+		using Image<Rgba32> image = new(1, colors.Count);
+		byte index = 0;
+		foreach (var color in colors)
+		{
+			var indexCopy = index;
+
+			image.Mutate(
+				img => img.Fill(
+					new Argb32((byte) (color >> 16), (byte) ((color >> 8) & 0xFF), (byte) (color & 0xFF)),
+					new RectangleF(0, indexCopy, 1, 1)
+				)
+			);
+			index++;
+		}
+
+		await image.SaveAsPngAsync(Path.Join("images", name + ".png"));
 	}
 }

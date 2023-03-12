@@ -16,5 +16,6 @@ RUN dotnet publish "RainbowAvatarBot.csproj" -c Release -r alpine-x64 --self-con
 
 FROM base AS final
 WORKDIR /app
+RUN apk add ffmpeg
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "RainbowAvatarBot.dll"]
