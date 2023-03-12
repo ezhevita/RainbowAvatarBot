@@ -143,7 +143,7 @@ Send me any image/sticker, and I will colorize it\!
 *To use bot in groups*:
   Reply to the message with image/sticker with `/colorize` command \(the same works with `/avatar`\) or send image with caption with that command\.
 
-_Developer of the bot \- @Vital\_7, I am always open to your messages_ :\)</value>
+_Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</value>
   </data>
 	<data name="UserProfilePictureNotFound" xml:space="preserve">
     <value>I can't find your profile picture! Please set it or change your privacy settings, so I would be able to see it.</value>
