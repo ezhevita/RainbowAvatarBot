@@ -40,7 +40,7 @@ public class VideoStickerProcessor : IProcessor
 						.WithOverlayVideoFilter(
 							overlayOptions =>
 							{
-								overlayOptions.OverlayMode = "overlay";
+								overlayOptions.OverlayMode = "hardlight";
 								overlayOptions.Opacity = 0.5f;
 								overlayOptions.Width = 512;
 								overlayOptions.Height = 512;
