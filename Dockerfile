@@ -19,3 +19,9 @@ WORKDIR /app
 RUN apk add ffmpeg
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "RainbowAvatarBot.dll"]
+
+FROM build as benchmarks
+WORKDIR "/src/RainbowAvatarBot.Benchmarks"
+RUN dotnet restore "RainbowAvatarBot.Benchmarks.csproj"
+RUN dotnet build "RainbowAvatarBot.Benchmarks.csproj" -c Release
+ENTRYPOINT ["dotnet", "run", "-c", "Release", "--no-build"]
