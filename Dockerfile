@@ -22,6 +22,7 @@ ENTRYPOINT ["dotnet", "RainbowAvatarBot.dll"]
 
 FROM build as benchmarks
 WORKDIR "/src/RainbowAvatarBot.Benchmarks"
+RUN apk add ffmpeg
 RUN dotnet restore "RainbowAvatarBot.Benchmarks.csproj"
 RUN dotnet build "RainbowAvatarBot.Benchmarks.csproj" -c Release
 ENTRYPOINT ["dotnet", "run", "-c", "Release", "--no-build"]
