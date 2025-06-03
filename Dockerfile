@@ -17,7 +17,13 @@ RUN dotnet publish "RainbowAvatarBot.csproj" -c Release -r linux-x64 --self-cont
 
 FROM base AS final
 WORKDIR /app
-RUN apk add ffmpeg
+RUN <<EOF cat > /etc/apk/repositories
+https://dl-cdn.alpinelinux.org/alpine/v$(cut -d'.' -f1,2 /etc/alpine-release)/main/
+https://dl-cdn.alpinelinux.org/alpine/v$(cut -d'.' -f1,2 /etc/alpine-release)/community/
+https://dl-cdn.alpinelinux.org/alpine/edge/testing/
+EOF
+
+RUN apk update && apk add ffmpeg
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "RainbowAvatarBot.dll"]
 
