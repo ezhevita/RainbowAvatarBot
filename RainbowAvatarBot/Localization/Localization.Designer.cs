@@ -28,7 +28,7 @@ namespace RainbowAvatarBot {
         internal static System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.Equals(null, resourceMan)) {
-                    System.Resources.ResourceManager temp = new System.Resources.ResourceManager("RainbowAvatarBot.locales.Localization", typeof(Localization).Assembly);
+                    System.Resources.ResourceManager temp = new System.Resources.ResourceManager("RainbowAvatarBot.Localization.Localization", typeof(Localization).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
@@ -54,12 +54,6 @@ namespace RainbowAvatarBot {
         internal static string InvalidFlagName {
             get {
                 return ResourceManager.GetString("InvalidFlagName", resourceCulture);
-            }
-        }
-        
-        internal static string ChangedSuccessfully {
-            get {
-                return ResourceManager.GetString("ChangedSuccessfully", resourceCulture);
             }
         }
         
@@ -186,12 +180,6 @@ namespace RainbowAvatarBot {
         internal static string Transgender {
             get {
                 return ResourceManager.GetString("Transgender", resourceCulture);
-            }
-        }
-        
-        internal static string VideoStickersNotSupported {
-            get {
-                return ResourceManager.GetString("VideoStickersNotSupported", resourceCulture);
             }
         }
     }

@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace RainbowAvatarBot;
+namespace RainbowAvatarBot.Services;
 
-public partial class PollingService : BackgroundService
+internal partial class PollingService : BackgroundService
 {
 	private readonly ILogger _logger;
 	private readonly IServiceProvider _serviceProvider;
@@ -27,12 +27,13 @@ public partial class PollingService : BackgroundService
 				using var scope = _serviceProvider.CreateScope();
 				var receiver = scope.ServiceProvider.GetRequiredService<ReceiverService>();
 
-				await receiver.ReceiveAsync(stoppingToken).ConfigureAwait(false);
-			} catch (Exception ex)
+				await receiver.ReceiveAsync(stoppingToken);
+			}
+			catch (Exception ex)
 			{
 				LogHandlingError(ex);
 
-				await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).ConfigureAwait(false);
+				await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
 			}
 		}
 	}

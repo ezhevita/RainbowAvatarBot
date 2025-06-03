@@ -1,6 +1,6 @@
 namespace RainbowAvatarBot;
 
-public class BotUserData
+internal class BotUserData
 {
 	public string Username { get; set; } = null!;
 }

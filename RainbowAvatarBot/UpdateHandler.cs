@@ -9,7 +9,7 @@ using Telegram.Bot.Types.Enums;
 
 namespace RainbowAvatarBot;
 
-public partial class UpdateHandler : IUpdateHandler
+internal partial class UpdateHandler : IUpdateHandler
 {
 	private readonly Bot _bot;
 	private readonly ILogger<UpdateHandler> _logger;
@@ -30,7 +30,8 @@ public partial class UpdateHandler : IUpdateHandler
 		};
 	}
 
-	public Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+	public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source,
+		CancellationToken cancellationToken)
 	{
 		LogPollingError(exception);
 

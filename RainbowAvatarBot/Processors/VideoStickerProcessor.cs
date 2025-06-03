@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -6,54 +7,55 @@ using FFMpegCore.Enums;
 using FFMpegCore.Pipes;
 using Microsoft.IO;
 using Telegram.Bot.Types;
-using File = System.IO.File;
 
 namespace RainbowAvatarBot.Processors;
 
-public class VideoStickerProcessor : IProcessor
+internal class VideoStickerProcessor : IProcessor
 {
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
+	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument;
+
+	private const string videoCodec = "libvpx-vp9";
 
 	public VideoStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager)
 	{
 		_memoryStreamManager = memoryStreamManager;
+		_overlayFfmpegArgument = new OverlayVideoFilterArgument(0.5F, "hardlight");
 	}
-	public bool CanProcessMediaType(MediaType mediaType) => mediaType == MediaType.VideoSticker;
 
-	public Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData) => Task.CompletedTask;
+	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.VideoSticker];
 
-	public async Task<InputMedia> Process(Stream input, string overlayName, MediaType mediaType)
+	public async Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker)
 	{
-		var resultStream = _memoryStreamManager.GetStream("ResultVideoStream", 256 * 1024);
+		if (!isSticker)
+		{
+			throw new ArgumentException("Expected input to be a sticker.", nameof(isSticker));
+		}
+
+		var resultStream = _memoryStreamManager.GetStream(nameof(VideoStickerProcessor), input.Length);
 
 		var resultFileName = Path.GetTempFileName();
 
 		try
 		{
-			var ffMpegArguments = FFMpegArguments.FromPipeInput(new StreamPipeSource(input))
-				.AddFileInput(Path.Join("images", overlayName + ".png"))
+			var ffMpegArguments = FFMpegArguments.FromPipeInput(
+					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec)
+						.WithHardwareAcceleration())
+				.AddFileInput(Path.Combine("images", overlayName + ".png"))
 				.OutputToPipe(
 					new StreamPipeSink(resultStream), addArguments: options => options.ForceFormat(VideoType.WebM)
-						.ForcePixelFormat("yuva420p")
-						.WithVideoCodec("libvpx-vp9")
+						.WithVideoCodec(videoCodec)
 						.WithVideoBitrate(400)
-						.WithOverlayVideoFilter(
-							overlayOptions =>
-							{
-								overlayOptions.OverlayMode = "hardlight";
-								overlayOptions.Opacity = 0.5f;
-								overlayOptions.Width = 512;
-								overlayOptions.Height = 512;
-							}
-						)
-				);
+						.WithArgument(_overlayFfmpegArgument)
+						.UsingMultithreading(true));
 
 			await ffMpegArguments.ProcessAsynchronously();
 
 			await using var resultFile = File.OpenRead(resultFileName);
 
 			await resultFile.CopyToAsync(resultStream);
-		} finally
+		}
+		finally
 		{
 			if (File.Exists(resultFileName))
 			{
@@ -63,6 +65,6 @@ public class VideoStickerProcessor : IProcessor
 
 		resultStream.Position = 0;
 
-		return new InputMedia(resultStream, "sticker.webm");
+		return new InputFileStream(resultStream, "sticker.webm");
 	}
 }

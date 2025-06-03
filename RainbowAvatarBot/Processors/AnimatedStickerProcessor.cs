@@ -1,59 +1,78 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using ICSharpCode.SharpZipLib.GZip;
+using Microsoft.Extensions.Options;
 using Microsoft.IO;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using RainbowAvatarBot.Configuration;
 using Telegram.Bot.Types;
 
 namespace RainbowAvatarBot.Processors;
 
-public class AnimatedStickerProcessor : IProcessor
+internal class AnimatedStickerProcessor : IProcessor
 {
-	private static JObject _gradientOverlay;
-	private static JObject _referenceObject;
-	private static IReadOnlyDictionary<string, float[]> _flagGradients;
-	private static IReadOnlyDictionary<string, int> _colorsCount;
-
+	private readonly JsonObject _gradientOverlay;
+	private readonly JsonObject _referenceObject;
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
+	private readonly FrozenDictionary<string, float[]> _flagGradients;
+	private readonly FrozenDictionary<string, int> _colorsCount;
 
-	public AnimatedStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager, AnimatedStickerHelperData helperData)
+	public AnimatedStickerProcessor(IOptions<ProcessingConfiguration> options, RecyclableMemoryStreamManager memoryStreamManager)
 	{
-		_memoryStreamManager = memoryStreamManager;
-		_gradientOverlay = helperData.GradientOverlay;
-		_referenceObject = helperData.ReferenceObject;
-	}
-
-	public bool CanProcessMediaType(MediaType mediaType) => mediaType == MediaType.AnimatedSticker;
-
-	public async Task<InputMedia> Process(Stream input, string overlayName, MediaType mediaType)
-	{
-		JObject stickerObject;
-		await using (GZipStream gzStream = new(input, CompressionMode.Decompress))
+		var gradientOverlay = JsonNode.Parse(options.Value.GradientOverlay);
+		if (gradientOverlay is null)
 		{
-			using StreamReader reader = new(gzStream);
-			using JsonTextReader jsonReader = new(reader);
-
-			stickerObject = await JObject.LoadAsync(jsonReader).ConfigureAwait(false);
+			throw new ArgumentException("Gradient overlay is not valid.", nameof(options));
 		}
 
-		var processedAnimation = ProcessLottieAnimation(stickerObject, overlayName);
+		var referenceObject = JsonNode.Parse(options.Value.ReferenceObject);
+		if (referenceObject is null)
+		{
+			throw new ArgumentException("Reference object is not valid.", nameof(options));
+		}
 
-		var result = await PackAnimatedSticker(processedAnimation).ConfigureAwait(false);
+		_gradientOverlay = gradientOverlay.AsObject();
+		_referenceObject = referenceObject.AsObject();
+		_memoryStreamManager = memoryStreamManager;
 
-		return new InputMedia(result, "sticker.tgs");
+		var flags = options.Value.Flags;
+		var flagGradients = flags.ToFrozenDictionary(x => x.Key, x => GenerateGradient(x.Value));
+		var colorsCount = flags.ToFrozenDictionary(x => x.Key, x => x.Value.Count);
+
+		_flagGradients = flagGradients;
+		_colorsCount = colorsCount;
 	}
 
-	public Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData)
-	{
-		_flagGradients = flagsData.ToDictionary(x => x.Key, x => GenerateGradient(x.Value));
-		_colorsCount = flagsData.ToDictionary(x => x.Key, x => x.Value.Count);
+	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.AnimatedSticker];
 
-		return Task.CompletedTask;
+	public async Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker)
+	{
+		if (!isSticker)
+		{
+			throw new ArgumentException("Expected input to be a sticker.", nameof(isSticker));
+		}
+
+		JsonNode? stickerObject;
+		await using (GZipStream gzStream = new(input, CompressionMode.Decompress, true))
+		{
+			stickerObject = await JsonNode.ParseAsync(gzStream);
+		}
+
+		if (stickerObject == null)
+		{
+			throw new ArgumentException("Invalid sticker object.", nameof(input));
+		}
+
+		var processedAnimation = ProcessLottieAnimation(stickerObject.AsObject(), overlayName);
+
+		var result = await PackAnimatedSticker(processedAnimation, input.Length);
+
+		return new InputFileStream(result, "sticker.tgs");
 	}
 
 	private static float[] GenerateGradient(IReadOnlyCollection<uint> rgbValues)
@@ -62,78 +81,66 @@ public class AnimatedStickerProcessor : IProcessor
 		byte index = 0;
 		foreach (var rgbValue in rgbValues)
 		{
-			void FillLine(byte startIndex, byte indexInc)
-			{
-				gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Count, 3);
-				gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
-				gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
-				gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
-			}
-
 			if (index > 0)
 			{
-				FillLine((byte) ((index << 3) - 4), 0);
+				FillLine((byte)((index << 3) - 4), 0);
 			}
 
 			if (index < rgbValues.Count - 1)
 			{
-				FillLine((byte) (index << 3), 1);
+				FillLine((byte)(index << 3), 1);
 			}
 
 			index++;
+
+			continue;
+
+			void FillLine(byte startIndex, byte indexInc)
+			{
+				gradientProps[startIndex] = (float)Math.Round((float)(index + indexInc) / rgbValues.Count, 3);
+				gradientProps[startIndex + 1] = (float)Math.Round((rgbValue >> 16) / 255.0, 3);
+				gradientProps[startIndex + 2] = (float)Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
+				gradientProps[startIndex + 3] = (float)Math.Round((rgbValue & 0xFF) / 255.0, 3);
+			}
 		}
 
 		return gradientProps;
 	}
 
-	private async Task<Stream> PackAnimatedSticker(JToken content)
+	private async Task<Stream> PackAnimatedSticker(JsonObject content, long length)
 	{
-		await using var memoryStream = _memoryStreamManager.GetStream("IntermediateForAnimatedSticker", 640 * 1024);
-		var resultStream = _memoryStreamManager.GetStream("ResultForAnimatedSticker", 64 * 1024);
+		var resultStream = _memoryStreamManager.GetStream(nameof(AnimatedStickerProcessor), length);
 
-		await using (StreamWriter streamWriter = new(memoryStream, leaveOpen: true))
-		using (JsonTextWriter jsonTextWriter = new(streamWriter)
-		       {
-			       Formatting = Formatting.None,
-			       AutoCompleteOnClose = true,
-			       CloseOutput = false
-		       })
-		{
-			await content.WriteToAsync(jsonTextWriter).ConfigureAwait(false);
-		}
-
-		memoryStream.Position = 0;
-
+		// SharpZipLib is used instead of native GZipStream because it provides better compression
 		await using (GZipOutputStream gzipOutput = new(resultStream))
 		{
 			gzipOutput.SetLevel(9);
 			gzipOutput.IsStreamOwner = false;
-			await memoryStream.CopyToAsync(gzipOutput).ConfigureAwait(false);
+			await JsonSerializer.SerializeAsync(gzipOutput, content);
 		}
 
 		resultStream.Position = 0;
-
 		return resultStream;
 	}
 
-	private static JObject ProcessLottieAnimation(JObject tokenizedSticker, string overlayName)
+	private JsonObject ProcessLottieAnimation(JsonObject tokenizedSticker, string overlayName)
 	{
-		var layersToken = (JArray) tokenizedSticker["layers"];
-		var assetsToken = (JArray) tokenizedSticker["assets"];
+		var layersToken = tokenizedSticker["layers"]?.AsArray() ?? throw new InvalidOperationException("Missing layers");
+		var assetsToken = tokenizedSticker["assets"]?.AsArray() ?? throw new InvalidOperationException("Missing assets");
 
 		var rgbValuesLength = _colorsCount[overlayName];
 
 		// Packing main animation to asset
-		JObject assetToken = new()
+		JsonNode assetToken = new JsonObject
 		{
 			["id"] = "_",
-			["layers"] = layersToken
+			["layers"] = layersToken.DeepClone()
 		};
 
 		// Getting last frame
-		var lastFrame = tokenizedSticker["op"].Value<ushort>();
+		var lastFrame = (tokenizedSticker["op"] ?? throw new InvalidOperationException("Missing frame count")).GetValue<ushort>();
 
-		layersToken.RemoveAll();
+		layersToken.Clear();
 		assetsToken.Add(assetToken);
 
 		// Layer that reference main animation from assets
@@ -142,14 +149,16 @@ public class AnimatedStickerProcessor : IProcessor
 		layersToken.Add(clonedReferenceLayerObject);
 
 		// Overlaying gradient
-		var gradientOverlayObject = (JObject) _gradientOverlay.DeepClone();
+		var gradientOverlayObject = _gradientOverlay.DeepClone();
 		gradientOverlayObject["op"] = lastFrame;
-		var gFillObject = (JObject) gradientOverlayObject["shapes"][0]["it"][2]["g"];
+		var gFillObject = (gradientOverlayObject["shapes"]?[0]?["it"]?[2]?["g"] ??
+			throw new InvalidOperationException("Missing fill object")).AsObject();
+
 		gFillObject["p"] = rgbValuesLength * 2 - 2;
 
 		var gradientProps = _flagGradients[overlayName];
 
-		gFillObject["k"]["k"] = new JArray(gradientProps);
+		gFillObject["k"]!["k"] = gradientProps.ToJsonArray();
 		layersToken.Add(gradientOverlayObject);
 
 		var clonedReferenceObject = clonedReferenceLayerObject.DeepClone();

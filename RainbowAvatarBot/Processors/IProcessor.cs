@@ -5,9 +5,8 @@ using Telegram.Bot.Types;
 
 namespace RainbowAvatarBot.Processors;
 
-public interface IProcessor
+internal interface IProcessor
 {
-	public bool CanProcessMediaType(MediaType mediaType);
-	public Task Init(IReadOnlyDictionary<string, IReadOnlyCollection<uint>> flagsData);
-	public Task<InputMedia> Process(Stream input, string overlayName, MediaType mediaType);
+	IEnumerable<MediaType> SupportedMediaTypes { get; }
+	Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker);
 }

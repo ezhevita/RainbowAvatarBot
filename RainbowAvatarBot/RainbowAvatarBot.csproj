@@ -1,51 +1,41 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
-
 	<PropertyGroup>
-		<AnalysisMode>AllEnabledByDefault</AnalysisMode>
-		<AssemblyVersion>3.0</AssemblyVersion>
-		<FileVersion>3.0</FileVersion>
-		<EnableNETAnalyzers>true</EnableNETAnalyzers>
-		<LangVersion>latest</LangVersion>
-		<NoWarn>CA2227;CA1002;CA2007;CA1062;CA1031</NoWarn>
-		<Nullable>enable</Nullable>
+		<NeutralLanguage>en</NeutralLanguage>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
+		<Version>4.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="FFMpegCore" Version="5.0.2" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="7.0.0" />
-		<PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="2.3.2" />
+		<PackageReference Include="FFMpegCore" Version="5.2.0" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
+		<PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
 		<PackageReference Include="SharpZipLib" Version="1.4.2" />
-		<PackageReference Include="SixLabors.ImageSharp" Version="3.0.0" />
-		<PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
-		<PackageReference Include="Telegram.Bot" Version="18.0.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.8" />
+		<PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
+		<PackageReference Include="Telegram.Bot" Version="22.5.1" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Update="locales\Localization.resx">
+		<EmbeddedResource Update="Localization/Localization.resx">
 			<Generator>ResXFileCodeGenerator</Generator>
 			<LastGenOutput>Localization.Designer.cs</LastGenOutput>
 		</EmbeddedResource>
 
-		<Compile Update="locales\Localization.Designer.cs">
+		<Compile Update="Localization/Localization.Designer.cs">
 			<DesignTime>True</DesignTime>
 			<AutoGen>True</AutoGen>
 			<DependentUpon>Localization.resx</DependentUpon>
 		</Compile>
 	</ItemGroup>
-
+	
 	<ItemGroup>
-		<None Update="flags.json5">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="gradientOverlay.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="placeholder.webm">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
+		<InternalsVisibleTo Include="RainbowAvatarBot.Benchmarks" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<None Update="Assets/sticker.webp" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 </Project>

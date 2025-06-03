@@ -1,6 +1,6 @@
 namespace RainbowAvatarBot;
 
-public enum MediaType
+internal enum MediaType
 {
 	Picture,
 	Sticker,

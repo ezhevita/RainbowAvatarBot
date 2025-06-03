@@ -124,88 +124,82 @@
 		</value>
 	</resheader>
 	<data name="Success" xml:space="preserve">
-    <value>Успешно!</value>
+    <value>Success!</value>
   </data>
 	<data name="InvalidFlagName" xml:space="preserve">
-    <value>Неверное название флага!</value>
-  </data>
-	<data name="ChangedSuccessfully" xml:space="preserve">
-    <value>Успешно изменено!</value>
+    <value>Invalid name of the flag!</value>
   </data>
 	<data name="StartMessage" xml:space="preserve">
-    <value>*Добро пожаловать в @RainbowAvatarBot\! 🏳️‍🌈*
-Отправь любое изображение/стикер, и я раскрашу его\!
+    <value>*Welcome to the @RainbowAvatarBot\! 🏳️‍🌈*
+Send me any image/sticker, and I will colorize it\!
 
-*Доступные команды*:
-  /settings \- поменять флаг
-  /avatar \- наложить флаг на твою аватарку
+*Available commands*:
+  /settings \- change flag
+  /avatar \- overlay your avatar with a flag
 
-*Для использования в группах*:
-  Ответь командой `/colorize` на уже имеющееся изображение/стикер \(то же самое работает и с `/avatar`\) или подпиши отправленное изображение этой командой\.
+*To use bot in groups*:
+  Reply to the message with image/sticker with `/colorize` command \(the same works with `/avatar`\) or send image with caption with that command\.
 
-_Разработала бота @ezhevita, я всегда готова выслушать ваши идеи и пожелания_ :\)</value>
+_Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</value>
   </data>
 	<data name="UserProfilePictureNotFound" xml:space="preserve">
-    <value>Я не могу найти твою аватарку! Пожалуйста, поменяй настройки приватности, чтобы я мог её увидеть.</value>
+    <value>I can't find your profile picture! Please set it or change your privacy settings, so I would be able to see it.</value>
   </data>
 	<data name="RepliedUserProfilePictureNotFound" xml:space="preserve">
-    <value>Я не могу найти аватар профиля из отвеченного сообщения! Обычно это происходит из-за выставленных настроек приватности, или у пользователя может не быть аватарки вовсе.</value>
+    <value>I can't find profile picture of profile from the reply! Usually that is because of privacy settings, or user may not have avatar at all.</value>
   </data>
 	<data name="ErrorOccured" xml:space="preserve">
-    <value>Произошла неизвестная ошибка! Пожалуйста, попробуй ещё раз или свяжись с разработчиком.</value>
+    <value>Unknown error occured! Please try again or contact developer.</value>
   </data>
 	<data name="SettingsSentToChat" xml:space="preserve">
-    <value>Команду настроек нужно отправить в ЛС.</value>
+    <value>Settings command should be sent to my PM.</value>
   </data>
 	<data name="SelectFlag" xml:space="preserve">
-    <value>Выбери флаг:</value>
+    <value>Select flag:</value>
   </data>
 	<data name="UnknownCommand" xml:space="preserve">
-    <value>Неизвестная команда!</value>
+    <value>Unknown command!</value>
   </data>
 	<data name="Processing" xml:space="preserve">
-    <value>Обработка...</value>
+    <value>Processing...</value>
   </data>
 	<data name="UnableToSend" xml:space="preserve">
-    <value>Не получилось отправить результат! Пожалуйста, попробуй ещё раз или свяжись с разработчиком.</value>
+    <value>I was unable to send the result! Please try again or contact developer.</value>
   </data>
 	<data name="Agender" xml:space="preserve">
-    <value>Агендерный</value>
+    <value>Agender</value>
   </data>
 	<data name="Asexual" xml:space="preserve">
-    <value>Асексуальный</value>
+    <value>Asexual</value>
   </data>
 	<data name="Bigender" xml:space="preserve">
-    <value>Бигендерный</value>
+    <value>Bigender</value>
   </data>
 	<data name="Bisexual" xml:space="preserve">
-    <value>Бисексуальный</value>
+    <value>Bisexual</value>
   </data>
 	<data name="Genderfluid" xml:space="preserve">
-    <value>Гендерфлюидный</value>
+    <value>Genderfluid</value>
   </data>
 	<data name="Genderqueer" xml:space="preserve">
-    <value>Гендерквирный</value>
+    <value>Genderqueer</value>
   </data>
 	<data name="Lesbian" xml:space="preserve">
-    <value>Лесбийский</value>
+    <value>Lesbian</value>
   </data>
 	<data name="LGBT" xml:space="preserve">
-    <value>ЛГБТ</value>
+    <value>LGBT</value>
   </data>
 	<data name="Nonbinary" xml:space="preserve">
-    <value>Небинарный</value>
+    <value>Nonbinary</value>
   </data>
 	<data name="Pansexual" xml:space="preserve">
-    <value>Пансексуальный</value>
+    <value>Pansexual</value>
   </data>
 	<data name="Polysexual" xml:space="preserve">
-    <value>Полисексуальный</value>
+    <value>Polysexual</value>
   </data>
 	<data name="Transgender" xml:space="preserve">
-    <value>Трансгендерный</value>
-  </data>
-	<data name="VideoStickersNotSupported" xml:space="preserve">
-    <value>Видео-стикеры на данный момент не поддерживаются.</value>
+    <value>Transgender</value>
   </data>
 </root>

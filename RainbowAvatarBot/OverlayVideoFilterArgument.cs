@@ -3,15 +3,18 @@ using FFMpegCore.Arguments;
 
 namespace RainbowAvatarBot;
 
-public class OverlayVideoFilterArgument : IArgument
+internal class OverlayVideoFilterArgument : IArgument
 {
-	private readonly OverlayVideoFilterArgumentOptions _options;
-
-	public OverlayVideoFilterArgument(OverlayVideoFilterArgumentOptions options)
+	public OverlayVideoFilterArgument(float opacity, string overlayMode)
 	{
-		_options = options;
+		var opacityText = opacity.ToString(CultureInfo.InvariantCulture);
+		Text = "-filter_complex \"" +
+			"[0:v]split=3[vid][ref][alpha];" +
+			"[alpha]alphaextract[mask];" +
+			"[1:v][ref]scale=rw:rh:flags=neighbor[scaled];" +
+			$"[vid][scaled]blend=all_mode={overlayMode}:all_opacity={opacityText}[blended];" +
+			"[blended][mask]alphamerge\"";
 	}
 
-	public string Text => $"-filter_complex \"[1:v]scale={_options.Width}:{_options.Height}:flags=neighbor [scld]," +
-		$"[0:v][scld]blend=all_mode='{_options.OverlayMode}':all_opacity={_options.Opacity.ToString(CultureInfo.InvariantCulture)}\"";
+	public string Text { get; }
 }

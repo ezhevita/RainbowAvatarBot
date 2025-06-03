@@ -4,9 +4,9 @@ using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types.Enums;
 
-namespace RainbowAvatarBot;
+namespace RainbowAvatarBot.Services;
 
-public class ReceiverService
+internal class ReceiverService
 {
 	private readonly ITelegramBotClient _botClient;
 	private readonly IUpdateHandler _updateHandlers;
@@ -23,14 +23,10 @@ public class ReceiverService
 	{
 		var receiverOptions = new ReceiverOptions
 		{
-			AllowedUpdates = new[] {UpdateType.Message, UpdateType.CallbackQuery},
-			ThrowPendingUpdates = true
+			AllowedUpdates = [UpdateType.Message, UpdateType.CallbackQuery],
+			DropPendingUpdates = true
 		};
 
-		await _botClient.ReceiveAsync(
-			_updateHandlers,
-			receiverOptions,
-			stoppingToken
-		).ConfigureAwait(false);
+		await _botClient.ReceiveAsync(_updateHandlers, receiverOptions, stoppingToken);
 	}
 }

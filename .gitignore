@@ -1,7 +1,7 @@
-# Created by .ignore support plugin (hsz.mobi)
 [Bb]in/
 [Oo]bj/
 .idea
-*.txt
-images
+images/
 .DS_Store
+config.json
+*.DotSettings.user

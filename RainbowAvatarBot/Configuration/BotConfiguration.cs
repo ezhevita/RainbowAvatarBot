@@ -1,6 +1,6 @@
-namespace RainbowAvatarBot;
+namespace RainbowAvatarBot.Configuration;
 
-public class BotConfiguration
+internal class BotConfiguration
 {
 	public string Token { get; set; } = null!;
 	public long OwnerId { get; set; }

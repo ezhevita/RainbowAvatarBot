@@ -1,14 +1,21 @@
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
+using Microsoft.Extensions.Options;
 using Microsoft.IO;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using RainbowAvatarBot.Configuration;
 using RainbowAvatarBot.Processors;
+using RainbowAvatarBot.Services;
+using SixLabors.ImageSharp;
 
 namespace RainbowAvatarBot.Benchmarks;
 
-[SimpleJob(RuntimeMoniker.Net70)]
-public class ProcessorBenchmarks
+[SimpleJob]
+internal sealed class ProcessorBenchmarks
 {
 	private Stream _animatedStickerInput = null!;
 	private Stream _imageStickerInput = null!;
@@ -21,42 +28,36 @@ public class ProcessorBenchmarks
 	public async Task Setup()
 	{
 		_animatedStickerInput = new UnclosableMemoryStream();
-		var content = await File.ReadAllBytesAsync("sticker.tgs");
+		var content = await File.ReadAllBytesAsync(Path.Combine("TestData", "sticker.tgs"));
 		_animatedStickerInput.Write(content);
 
 		_imageStickerInput = new UnclosableMemoryStream();
-		content = await File.ReadAllBytesAsync("sticker.webp");
+		content = await File.ReadAllBytesAsync(Path.Combine("TestData", "sticker.webp"));
 		_imageStickerInput.Write(content);
 
 		_videoStickerInput = new UnclosableMemoryStream();
-		content = await File.ReadAllBytesAsync("sticker.webm");
+		content = await File.ReadAllBytesAsync(Path.Combine("TestData", "sticker.webm"));
 		_videoStickerInput.Write(content);
 
-		var gradientOverlay = await File.ReadAllTextAsync("gradientOverlay.json");
-
-		const string ReferenceObject = "{\"ind\":1,\"ty\":0,\"refId\":\"_\",\"sr\":1,\"ks\":{\"o\":{\"a\":0,\"k\":100},\"r\":" +
-			"{\"a\":0,\"k\":0},\"p\":{\"k\":[256,256,0]},\"a\":{\"k\":[256,256,0]}},\"w\":512,\"h\":512}";
-
 		var memoryStreamManager = new RecyclableMemoryStreamManager();
-		_animatedStickerProcessor = new AnimatedStickerProcessor(
-			memoryStreamManager,
-			new AnimatedStickerHelperData(JObject.Parse(gradientOverlay), JObject.Parse(ReferenceObject))
-		);
+		Configuration configuration;
+		await using (var file = File.Open("appsettings.json", FileMode.Open, FileAccess.Read, FileShare.Read))
+		{
+			configuration = (await JsonSerializer.DeserializeAsync<Configuration>(file))!;
+		}
 
-		_imageStickerProcessor = new ImageProcessor(memoryStreamManager);
+		var options = new OptionsWrapper<ProcessingConfiguration>(configuration.Processing);
+		var images = new Dictionary<string, Image>();
+		var initService = new InitializationHostedService(null!, null!, null!, images, options, null!);
+		await initService.InitializeImages(CancellationToken.None);
+
+		_animatedStickerProcessor = new AnimatedStickerProcessor(options, memoryStreamManager);
+		_imageStickerProcessor = new ImageProcessor(new FlagImageService(images), memoryStreamManager);
 		_videoStickerProcessor = new VideoStickerProcessor(memoryStreamManager);
-
-		var flagsContent = await File.ReadAllTextAsync("flags.json5");
-
-		var flags = JsonConvert.DeserializeObject<Dictionary<string, IReadOnlyCollection<uint>>>(flagsContent);
-
-		Directory.CreateDirectory("images");
-
-		await _imageStickerProcessor.Init(flags);
-		await Task.WhenAll(_animatedStickerProcessor.Init(flags), _videoStickerProcessor.Init(flags));
 	}
 
-	[Params("LGBT", "Agender", "Genderqueer")]
+	[Params("LGBT")]
+	[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
 	public string FlagName { get; set; }
 
 	[Benchmark]
@@ -64,7 +65,7 @@ public class ProcessorBenchmarks
 	{
 		_animatedStickerInput.Position = 0;
 
-		return _animatedStickerProcessor.Process(_animatedStickerInput, FlagName, MediaType.AnimatedSticker);
+		return _animatedStickerProcessor.Process(_animatedStickerInput, FlagName, true);
 	}
 
 	[Benchmark]
@@ -72,7 +73,7 @@ public class ProcessorBenchmarks
 	{
 		_imageStickerInput.Position = 0;
 
-		return _imageStickerProcessor.Process(_imageStickerInput, FlagName, MediaType.Sticker);
+		return _imageStickerProcessor.Process(_imageStickerInput, FlagName, true);
 	}
 
 	[Benchmark]
@@ -80,6 +81,6 @@ public class ProcessorBenchmarks
 	{
 		_videoStickerInput.Position = 0;
 
-		return _videoStickerProcessor.Process(_videoStickerInput, FlagName, MediaType.VideoSticker);
+		return _videoStickerProcessor.Process(_videoStickerInput, FlagName, true);
 	}
 }

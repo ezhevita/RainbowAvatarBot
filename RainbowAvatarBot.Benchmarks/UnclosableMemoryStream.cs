@@ -1,6 +1,8 @@
+using System.IO;
+
 namespace RainbowAvatarBot.Benchmarks;
 
-public class UnclosableMemoryStream : MemoryStream
+internal class UnclosableMemoryStream : MemoryStream
 {
 	protected override void Dispose(bool disposing)
 	{
