@@ -5,22 +5,24 @@ using System.Threading.Tasks;
 using FFMpegCore;
 using FFMpegCore.Enums;
 using FFMpegCore.Pipes;
+using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 using Telegram.Bot.Types;
 
 namespace RainbowAvatarBot.Processors;
 
-internal class VideoStickerProcessor : IProcessor
+internal partial class VideoStickerProcessor : IProcessor
 {
+	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument = new(0.5F, "hardlight");
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
-	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument;
+	private readonly ILogger<VideoStickerProcessor> _logger;
 
 	private const string videoCodec = "libvpx-vp9";
 
-	public VideoStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager)
+	public VideoStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager, ILogger<VideoStickerProcessor> logger)
 	{
 		_memoryStreamManager = memoryStreamManager;
-		_overlayFfmpegArgument = new OverlayVideoFilterArgument(0.5F, "hardlight");
+		_logger = logger;
 	}
 
 	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.VideoSticker];
@@ -47,15 +49,15 @@ internal class VideoStickerProcessor : IProcessor
 						.WithVideoCodec(videoCodec)
 						.WithVideoBitrate(400)
 						.WithArgument(_overlayFfmpegArgument)
-						.UsingMultithreading(true));
+						.UsingMultithreading(true))
+				.NotifyOnError(LogFFmpegError);
 
 			await ffMpegArguments.ProcessAsynchronously();
 
 			await using var resultFile = File.OpenRead(resultFileName);
 
 			await resultFile.CopyToAsync(resultStream);
-		}
-		finally
+		} finally
 		{
 			if (File.Exists(resultFileName))
 			{
@@ -67,4 +69,7 @@ internal class VideoStickerProcessor : IProcessor
 
 		return new InputFileStream(resultStream, "sticker.webm");
 	}
+
+	[LoggerMessage(LogLevel.Error, "An error occurred during FFmpeg execution: {Message}")]
+	private partial void LogFFmpegError(string message);
 }
