@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 using FFMpegCore;
 using FFMpegCore.Enums;
 using FFMpegCore.Pipes;
-using Microsoft.Extensions.Logging;
 using Microsoft.IO;
+using RainbowAvatarBot.FFMpeg;
 using Telegram.Bot.Types;
 
 namespace RainbowAvatarBot.Processors;
 
-internal partial class VideoStickerProcessor : IProcessor
+internal class VideoStickerProcessor : IProcessor
 {
 	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument = new(0.5F, "hardlight");
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
@@ -39,15 +39,13 @@ internal partial class VideoStickerProcessor : IProcessor
 		try
 		{
 			var ffMpegArguments = FFMpegArguments.FromPipeInput(
-					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec)
-						.WithHardwareAcceleration())
+					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec))
 				.AddFileInput(Path.Combine("images", overlayName + ".png"))
 				.OutputToPipe(
 					new StreamPipeSink(resultStream), addArguments: options => options.ForceFormat(VideoType.WebM)
-						.WithVideoCodec(videoCodec)
-						.WithVideoBitrate(400)
-						.WithArgument(_overlayFfmpegArgument)
-						.UsingMultithreading(true));
+						// This is necessary to make TGMac client use video resolution, otherwise it stretches height to 512
+						.WithDuration(TimeSpan.FromSeconds(3))
+						.WithArgument(_overlayFfmpegArgument));
 
 			await ffMpegArguments.ProcessAsynchronously();
 

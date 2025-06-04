@@ -155,7 +155,7 @@ internal sealed partial class ColorizeCommand : ICommand
 
 	private static async Task DeleteStickerLater(ITelegramBotClient botClient, string fileId)
 	{
-		await Task.Delay(5000);
+		await Task.Delay(1000);
 		await botClient.DeleteStickerFromSet(fileId);
 	}
 }

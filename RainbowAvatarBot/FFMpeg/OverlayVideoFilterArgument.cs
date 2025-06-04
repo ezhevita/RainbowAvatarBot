@@ -1,7 +1,7 @@
 using System.Globalization;
 using FFMpegCore.Arguments;
 
-namespace RainbowAvatarBot;
+namespace RainbowAvatarBot.FFMpeg;
 
 internal class OverlayVideoFilterArgument : IArgument
 {
@@ -10,7 +10,7 @@ internal class OverlayVideoFilterArgument : IArgument
 		var opacityText = opacity.ToString(CultureInfo.InvariantCulture);
 		Text = "-filter_complex \"" +
 			"[0:v]split=3[vid][ref][alpha];" +
-			"[alpha]alphaextract[mask];" +
+			"[alpha]format=pix_fmts=yuva420p,alphaextract[mask];" +
 			"[1:v][ref]scale=rw:rh:flags=neighbor[scaled];" +
 			$"[vid][scaled]blend=all_mode={overlayMode}:all_opacity={opacityText}[blended];" +
 			"[blended][mask]alphamerge\"";
