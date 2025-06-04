@@ -38,11 +38,8 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --disable-doc \
   --disable-ffplay \
   --disable-ffprobe \
-  --extra-cflags="-I${PREFIX}/include" \
-  --extra-ldflags="-L${PREFIX}/lib" \
-  --extra-libs="-lpthread -lm" \
   --prefix="${PREFIX}" && \
-  make && make install && make distclean
+  make && make install
 
 FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine AS base
 WORKDIR /app

@@ -15,14 +15,12 @@ internal partial class VideoStickerProcessor : IProcessor
 {
 	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument = new(0.5F, "hardlight");
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
-	private readonly ILogger<VideoStickerProcessor> _logger;
 
 	private const string videoCodec = "libvpx-vp9";
 
-	public VideoStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager, ILogger<VideoStickerProcessor> logger)
+	public VideoStickerProcessor(RecyclableMemoryStreamManager memoryStreamManager)
 	{
 		_memoryStreamManager = memoryStreamManager;
-		_logger = logger;
 	}
 
 	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.VideoSticker];
@@ -49,8 +47,7 @@ internal partial class VideoStickerProcessor : IProcessor
 						.WithVideoCodec(videoCodec)
 						.WithVideoBitrate(400)
 						.WithArgument(_overlayFfmpegArgument)
-						.UsingMultithreading(true))
-				.NotifyOnError(LogFFmpegError);
+						.UsingMultithreading(true));
 
 			await ffMpegArguments.ProcessAsynchronously();
 
@@ -69,7 +66,4 @@ internal partial class VideoStickerProcessor : IProcessor
 
 		return new InputFileStream(resultStream, "sticker.webm");
 	}
-
-	[LoggerMessage(LogLevel.Error, "An error occurred during FFmpeg execution: {Message}")]
-	private partial void LogFFmpegError(string message);
 }
