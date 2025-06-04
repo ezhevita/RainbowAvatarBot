@@ -42,7 +42,7 @@ internal sealed class SettingsCommand : ICommand
 				{ CallbackData = "SETTINGS_" + name })
 				.OrderBy(button => button.Text));
 
-		return Task.FromResult(new ResultMessage(Localization.SelectFlag, markup))!;
+		return Task.FromResult(new ResultMessage(Localization.SelectFlag, markup: markup))!;
 	}
 
 	private static InlineKeyboardMarkup BuildKeyboard(byte width, IEnumerable<InlineKeyboardButton> buttons)

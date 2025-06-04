@@ -93,18 +93,6 @@ namespace RainbowAvatarBot {
             }
         }
         
-        internal static string UnknownCommand {
-            get {
-                return ResourceManager.GetString("UnknownCommand", resourceCulture);
-            }
-        }
-        
-        internal static string Processing {
-            get {
-                return ResourceManager.GetString("Processing", resourceCulture);
-            }
-        }
-        
         internal static string UnableToSend {
             get {
                 return ResourceManager.GetString("UnableToSend", resourceCulture);

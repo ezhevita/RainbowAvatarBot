@@ -49,6 +49,7 @@ var host = Host.CreateDefaultBuilder(args)
 			services.AddScoped<ICommand, AvatarCommand>();
 			services.AddScoped<ICommand, ColorizeCommand>();
 			services.AddScoped<ICommand, SettingsCommand>();
+			services.AddScoped<ICommand, StartCommand>();
 			services.AddScoped<CommandHandler>();
 			services.AddSingleton<Bot>();
 

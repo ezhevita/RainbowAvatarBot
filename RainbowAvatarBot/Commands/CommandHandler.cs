@@ -49,10 +49,11 @@ internal sealed partial class CommandHandler
 		var replyParameters = new ReplyParameters { MessageId = message.Id };
 		Task<Message?> task = (result switch
 		{
-			{ Text: { } text } => _botClient.SendMessage(message.Chat, text, ParseMode.MarkdownV2, replyParameters, result.Markup),
-			{ Media: { } media, MediaType: MediaType.Picture } => _botClient.SendPhoto(
+			{Text: { } text} => _botClient.SendMessage(
+				message.Chat, text, result.IsMarkdown ? ParseMode.MarkdownV2 : ParseMode.None, replyParameters, result.Markup),
+			{Media: { } media, MediaType: MediaType.Picture} => _botClient.SendPhoto(
 				message.Chat, media, replyParameters: replyParameters),
-			{ Media: { } media, MediaType: { } mediaType } when mediaType.IsSticker() => _botClient.SendSticker(
+			{Media: { } media, MediaType: { } mediaType} when mediaType.IsSticker() => _botClient.SendSticker(
 				message.Chat, media, replyParameters),
 			_ => Task.FromResult<Message?>(null)!
 		})!;

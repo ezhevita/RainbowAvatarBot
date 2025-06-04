@@ -146,8 +146,8 @@ _Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</valu
     <value>I can't find your profile picture! Please set it or change your privacy settings, so I would be able to see it.</value>
   </data>
 	<data name="RepliedUserProfilePictureNotFound" xml:space="preserve">
-    <value>I can't find profile picture of profile from the reply! Usually that is because of privacy settings, or user may not have avatar at all.</value>
-  </data>
+		<value>I can't find profile picture of profile from the reply! Usually that is because of privacy settings, or user may not have avatar at all.</value>
+	</data>
 	<data name="ErrorOccured" xml:space="preserve">
     <value>Unknown error occured! Please try again or contact developer.</value>
   </data>
@@ -156,12 +156,6 @@ _Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</valu
   </data>
 	<data name="SelectFlag" xml:space="preserve">
     <value>Select flag:</value>
-  </data>
-	<data name="UnknownCommand" xml:space="preserve">
-    <value>Unknown command!</value>
-  </data>
-	<data name="Processing" xml:space="preserve">
-    <value>Processing...</value>
   </data>
 	<data name="UnableToSend" xml:space="preserve">
     <value>I was unable to send the result! Please try again or contact developer.</value>

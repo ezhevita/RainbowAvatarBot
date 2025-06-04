@@ -6,27 +6,24 @@ namespace RainbowAvatarBot.Commands;
 
 internal sealed record ResultMessage : IDisposable
 {
-	public ResultMessage(string text)
-	{
-		Text = text;
-	}
-
 	public ResultMessage(InputFile media, MediaType mediaType)
 	{
 		Media = media;
 		MediaType = mediaType;
 	}
 
-	public ResultMessage(string text, ReplyMarkup markup)
+	public ResultMessage(string text, bool isMarkdown = false, ReplyMarkup? markup = null)
 	{
-		Markup = markup;
 		Text = text;
+		IsMarkdown = isMarkdown;
+		Markup = markup;
 	}
 
 	public ReplyMarkup? Markup { get; }
 	public InputFile? Media { get; }
 	public MediaType? MediaType { get; }
 	public string? Text { get; }
+	public bool IsMarkdown { get; }
 
 	public void Dispose()
 	{
