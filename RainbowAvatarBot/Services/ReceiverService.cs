@@ -9,14 +9,12 @@ namespace RainbowAvatarBot.Services;
 internal class ReceiverService
 {
 	private readonly ITelegramBotClient _botClient;
-	private readonly IUpdateHandler _updateHandlers;
+	private readonly IUpdateHandler _updateHandler;
 
-	public ReceiverService(
-		ITelegramBotClient botClient,
-		IUpdateHandler updateHandler)
+	public ReceiverService(ITelegramBotClient botClient, IUpdateHandler updateHandler)
 	{
 		_botClient = botClient;
-		_updateHandlers = updateHandler;
+		_updateHandler = updateHandler;
 	}
 
 	public async Task ReceiveAsync(CancellationToken stoppingToken)
@@ -27,6 +25,6 @@ internal class ReceiverService
 			DropPendingUpdates = true
 		};
 
-		await _botClient.ReceiveAsync(_updateHandlers, receiverOptions, stoppingToken);
+		await _botClient.ReceiveAsync(_updateHandler, receiverOptions, stoppingToken);
 	}
 }

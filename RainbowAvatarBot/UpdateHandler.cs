@@ -22,12 +22,14 @@ internal partial class UpdateHandler : IUpdateHandler
 
 	public Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
 	{
-		return update.Type switch
+		Task.Run(() => update.Type switch
 		{
 			UpdateType.Message => _bot.OnMessage(update.Message!),
 			UpdateType.CallbackQuery => _bot.OnCallbackQuery(update.CallbackQuery!),
 			_ => Task.CompletedTask
-		};
+		}, cancellationToken);
+
+		return Task.CompletedTask;
 	}
 
 	public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source,
