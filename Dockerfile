@@ -32,7 +32,7 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --enable-demuxer=matroska,image2 \
   --enable-muxer=matroska,webm \
   --enable-parser=vp9,png \
-  --enable-protocol=file,pipe \
+  --enable-protocol=file,unix \
   --enable-filter=split,alphaextract,scale,blend,alphamerge \
   --disable-debug \
   --disable-doc \
