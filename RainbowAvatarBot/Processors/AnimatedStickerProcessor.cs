@@ -50,7 +50,7 @@ internal class AnimatedStickerProcessor : IProcessor
 
 	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.AnimatedSticker];
 
-	public async Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker)
+	public async Task<InputFileStream> Process(Stream input, UserSettings settings, bool isSticker)
 	{
 		if (!isSticker)
 		{
@@ -68,7 +68,7 @@ internal class AnimatedStickerProcessor : IProcessor
 			throw new ArgumentException("Invalid sticker object.", nameof(input));
 		}
 
-		var processedAnimation = ProcessLottieAnimation(stickerObject.AsObject(), overlayName);
+		var processedAnimation = ProcessLottieAnimation(stickerObject.AsObject(), settings);
 
 		var result = await PackAnimatedSticker(processedAnimation, input.Length);
 
@@ -123,12 +123,12 @@ internal class AnimatedStickerProcessor : IProcessor
 		return resultStream;
 	}
 
-	private JsonObject ProcessLottieAnimation(JsonObject tokenizedSticker, string overlayName)
+	private JsonObject ProcessLottieAnimation(JsonObject tokenizedSticker, UserSettings settings)
 	{
 		var layersToken = tokenizedSticker["layers"]?.AsArray() ?? throw new InvalidOperationException("Missing layers");
 		var assetsToken = tokenizedSticker["assets"]?.AsArray() ?? throw new InvalidOperationException("Missing assets");
 
-		var rgbValuesLength = _colorsCount[overlayName];
+		var rgbValuesLength = _colorsCount[settings.FlagName];
 
 		// Packing main animation to asset
 		JsonNode assetToken = new JsonObject
@@ -151,12 +151,14 @@ internal class AnimatedStickerProcessor : IProcessor
 		// Overlaying gradient
 		var gradientOverlayObject = _gradientOverlay.DeepClone();
 		gradientOverlayObject["op"] = lastFrame;
+		gradientOverlayObject["ks"]!["o"]!["k"] = settings.Opacity;
+
 		var gFillObject = (gradientOverlayObject["shapes"]?[0]?["it"]?[2]?["g"] ??
 			throw new InvalidOperationException("Missing fill object")).AsObject();
 
 		gFillObject["p"] = rgbValuesLength * 2 - 2;
 
-		var gradientProps = _flagGradients[overlayName];
+		var gradientProps = _flagGradients[settings.FlagName];
 
 		gFillObject["k"]!["k"] = gradientProps.ToJsonArray();
 		layersToken.Add(gradientOverlayObject);

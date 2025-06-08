@@ -51,12 +51,6 @@ namespace RainbowAvatarBot {
             }
         }
         
-        internal static string InvalidFlagName {
-            get {
-                return ResourceManager.GetString("InvalidFlagName", resourceCulture);
-            }
-        }
-        
         internal static string StartMessage {
             get {
                 return ResourceManager.GetString("StartMessage", resourceCulture);
@@ -168,6 +162,48 @@ namespace RainbowAvatarBot {
         internal static string Transgender {
             get {
                 return ResourceManager.GetString("Transgender", resourceCulture);
+            }
+        }
+        
+        internal static string SelectSettingToChange {
+            get {
+                return ResourceManager.GetString("SelectSettingToChange", resourceCulture);
+            }
+        }
+        
+        internal static string FlagSettings {
+            get {
+                return ResourceManager.GetString("FlagSettings", resourceCulture);
+            }
+        }
+        
+        internal static string OpacitySettings {
+            get {
+                return ResourceManager.GetString("OpacitySettings", resourceCulture);
+            }
+        }
+        
+        internal static string GoBack {
+            get {
+                return ResourceManager.GetString("GoBack", resourceCulture);
+            }
+        }
+        
+        internal static string SelectOpacity {
+            get {
+                return ResourceManager.GetString("SelectOpacity", resourceCulture);
+            }
+        }
+        
+        internal static string BlendModeSettings {
+            get {
+                return ResourceManager.GetString("BlendModeSettings", resourceCulture);
+            }
+        }
+        
+        internal static string SelectBlendMode {
+            get {
+                return ResourceManager.GetString("SelectBlendMode", resourceCulture);
             }
         }
     }

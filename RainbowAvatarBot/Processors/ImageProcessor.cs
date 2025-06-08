@@ -40,15 +40,15 @@ internal class ImageProcessor : IProcessor
 
 	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.Picture, MediaType.Sticker];
 
-	public async Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker)
+	public async Task<InputFileStream> Process(Stream input, UserSettings settings, bool isSticker)
 	{
 		var image = await Image.LoadAsync(input);
-		using (var resized = _flagImageService.GetFlag(overlayName)
+		using (var resized = _flagImageService.GetFlag(settings.FlagName)
 				   .Clone(img => img.Resize(image.Width, image.Height, new NearestNeighborResampler())))
 		{
 			// ReSharper disable once AccessToDisposedClosure
 			image.Mutate(img => img.DrawImage(
-				resized, PixelColorBlendingMode.HardLight, PixelAlphaCompositionMode.SrcAtop, 0.5f));
+				resized, settings.BlendMode.ToImageSharp(), PixelAlphaCompositionMode.SrcAtop, settings.Opacity / 100.0f));
 		}
 
 		var result = _memoryStreamManager.GetStream(nameof(ImageProcessor), input.Length);

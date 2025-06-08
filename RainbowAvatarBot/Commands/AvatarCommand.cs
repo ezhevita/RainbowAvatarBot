@@ -44,7 +44,7 @@ internal sealed partial class AvatarCommand : ICommand
 			return null;
 		}
 
-		var overlayName = _userSettingsService.GetFlagForUser(senderID);
+		var settings = _userSettingsService.GetSettingsForUser(senderID);
 
 		bool isReplied;
 		long userIdForAvatars;
@@ -67,8 +67,8 @@ internal sealed partial class AvatarCommand : ICommand
 		}
 
 		var sourceImage = avatars.Photos.Single().MaxBy(photo => photo.Height)!;
-		if (_memoryCache.TryGetValue<string>(new { sourceImage.FileUniqueId, overlayName }, out var fileId) &&
-			!string.IsNullOrEmpty(fileId))
+		var cacheKey = new {sourceImage.FileUniqueId, settings};
+		if (_memoryCache.TryGetValue<string>(cacheKey, out var fileId) && !string.IsNullOrEmpty(fileId))
 		{
 			return new ResultMessage(new InputFileId(fileId), MediaType.Picture);
 		}
@@ -87,7 +87,7 @@ internal sealed partial class AvatarCommand : ICommand
 		stream.Position = 0;
 
 		var sw = Stopwatch.StartNew();
-		var result = await processor.Process(stream, overlayName, false);
+		var result = await processor.Process(stream, settings, false);
 
 		sw.Stop();
 		LogProcessed(sw.ElapsedMilliseconds);

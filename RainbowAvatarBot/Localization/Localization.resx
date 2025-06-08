@@ -126,9 +126,6 @@
 	<data name="Success" xml:space="preserve">
     <value>Success!</value>
   </data>
-	<data name="InvalidFlagName" xml:space="preserve">
-    <value>Invalid name of the flag!</value>
-  </data>
 	<data name="StartMessage" xml:space="preserve">
     <value>*Welcome to the @RainbowAvatarBot\! 🏳️‍🌈*
 Send me any image/sticker, and I will colorize it\!
@@ -155,8 +152,8 @@ _Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</valu
     <value>Settings command should be sent to my PM.</value>
   </data>
 	<data name="SelectFlag" xml:space="preserve">
-    <value>Select flag:</value>
-  </data>
+		<value>Select flag (default is LGBT):</value>
+	</data>
 	<data name="UnableToSend" xml:space="preserve">
     <value>I was unable to send the result! Please try again or contact developer.</value>
   </data>
@@ -196,4 +193,25 @@ _Developer of the bot \- @ezhevita, I am always open to your messages_ :\)</valu
 	<data name="Transgender" xml:space="preserve">
     <value>Transgender</value>
   </data>
+	<data name="SelectSettingToChange" xml:space="preserve">
+		<value>Choose setting to change:</value>
+	</data>
+	<data name="FlagSettings" xml:space="preserve">
+		<value>Flag</value>
+	</data>
+	<data name="OpacitySettings" xml:space="preserve">
+		<value>Opacity</value>
+	</data>
+	<data name="GoBack" xml:space="preserve">
+		<value>Back</value>
+	</data>
+	<data name="SelectOpacity" xml:space="preserve">
+		<value>Select opacity (default is 50%):</value>
+	</data>
+	<data name="BlendModeSettings" xml:space="preserve">
+		<value>Blend mode</value>
+	</data>
+	<data name="SelectBlendMode" xml:space="preserve">
+		<value>Select blend mode (works only for images and video stickers, default is HardLight):</value>
+	</data>
 </root>

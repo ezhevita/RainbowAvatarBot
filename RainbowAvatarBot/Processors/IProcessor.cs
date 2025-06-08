@@ -8,5 +8,5 @@ namespace RainbowAvatarBot.Processors;
 internal interface IProcessor
 {
 	IEnumerable<MediaType> SupportedMediaTypes { get; }
-	Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker);
+	Task<InputFileStream> Process(Stream input, UserSettings settings, bool isSticker);
 }

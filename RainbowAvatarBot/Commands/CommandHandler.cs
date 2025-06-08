@@ -69,7 +69,7 @@ internal sealed partial class CommandHandler
 		if (result is { MediaType: { } type } && type.IsSticker() && (response.Sticker == null))
 		{
 			await _botClient.DeleteMessage(response.Chat, response.MessageId);
-			await _botClient.SendMessage(message.Chat.Id, Localization.UnableToSend, ParseMode.MarkdownV2, replyParameters);
+			await _botClient.SendMessage(message.Chat.Id, Localization.UnableToSend, replyParameters: replyParameters);
 		}
 	}
 

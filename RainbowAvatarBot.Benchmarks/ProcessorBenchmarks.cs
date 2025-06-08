@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text.Json;
 using System.Threading;
@@ -56,16 +55,20 @@ internal sealed class ProcessorBenchmarks
 		_videoStickerProcessor = new VideoStickerProcessor(memoryStreamManager);
 	}
 
-	[Params("LGBT")]
-	[SuppressMessage("ReSharper", "UnusedAutoPropertyAccessor.Global")]
-	public string FlagName { get; set; }
+	[ParamsSource(nameof(GenerateSettings))]
+	public UserSettings Settings { get; set; }
+
+	private static IEnumerable<UserSettings> GenerateSettings()
+	{
+		return [new UserSettings()];
+	}
 
 	[Benchmark]
 	public Task ProcessAnimatedSticker()
 	{
 		_animatedStickerInput.Position = 0;
 
-		return _animatedStickerProcessor.Process(_animatedStickerInput, FlagName, true);
+		return _animatedStickerProcessor.Process(_animatedStickerInput, Settings, true);
 	}
 
 	[Benchmark]
@@ -73,7 +76,7 @@ internal sealed class ProcessorBenchmarks
 	{
 		_imageStickerInput.Position = 0;
 
-		return _imageStickerProcessor.Process(_imageStickerInput, FlagName, true);
+		return _imageStickerProcessor.Process(_imageStickerInput, Settings, true);
 	}
 
 	[Benchmark]
@@ -81,6 +84,6 @@ internal sealed class ProcessorBenchmarks
 	{
 		_videoStickerInput.Position = 0;
 
-		return _videoStickerProcessor.Process(_videoStickerInput, FlagName, true);
+		return _videoStickerProcessor.Process(_videoStickerInput, Settings, true);
 	}
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace RainbowAvatarBot;
 
@@ -81,36 +83,129 @@ internal sealed partial class Bot
 		}
 	}
 
+	// TODO: refactor as callback handlers
 	public async Task OnCallbackQuery(CallbackQuery callbackQuery)
 	{
 		SetThreadLocale(callbackQuery.From.LanguageCode);
 
-		if (callbackQuery is not { Id: { } callbackId, From.Id: var senderId, Data: { } data, Message: { } message })
+		if (callbackQuery is not { Id: { } callbackId, From.Id: var senderId, Data: { } data, Message.Id: { } messageId })
 		{
 			return;
 		}
 
-		var indexOfUnderscore = data.IndexOf('_', StringComparison.Ordinal);
-		if (indexOfUnderscore == -1)
+		if (data.Equals("SETTINGS", StringComparison.OrdinalIgnoreCase))
 		{
-			return;
-		}
-
-		if (!data.AsSpan()[..indexOfUnderscore].Equals("settings", StringComparison.OrdinalIgnoreCase))
-		{
-			return;
-		}
-
-		var name = data[(indexOfUnderscore + 1)..];
-		if (!_flagImageService.IsValidFlagName(name))
-		{
-			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.InvalidFlagName);
+			await _telegramBotClient.EditMessageText(
+				senderId, messageId, Localization.SelectSettingToChange,
+				replyMarkup: Utilities.BuildSettingsKeyboard(_botConfiguration.EnableBlendModeSettings));
+			await _telegramBotClient.AnswerCallbackQuery(callbackId);
 
 			return;
 		}
 
-		_userSettingsService.SetFlagForUser(senderId, name);
-		await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+		var callbackArguments = data.Split('_');
+		if (callbackArguments.Length < 2 || !callbackArguments[0].Equals("settings", StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+
+		var additionalArgument = callbackArguments.Length > 2 ? callbackArguments[2] : null;
+
+		try
+		{
+			var processTask = callbackArguments[1].ToUpperInvariant() switch
+			{
+				"BLENDMODE" => ProcessBlendModeCallback(senderId, messageId, callbackId, additionalArgument),
+				"FLAG" => ProcessFlagCallback(senderId, messageId, callbackId, additionalArgument),
+				"OPACITY" => ProcessOpacityCallback(senderId, messageId, callbackId, additionalArgument),
+				_ => _telegramBotClient.AnswerCallbackQuery(callbackId)
+			};
+
+			await processTask;
+		} catch (Exception e)
+		{
+			LogCallbackException(e);
+		}
+	}
+
+	private async Task ProcessBlendModeCallback(long userId, int messageId, string callbackId, string? argument)
+	{
+		if (argument != null)
+		{
+			if (!Enum.TryParse<BlendMode>(argument, true, out var blendMode) || !Enum.IsDefined(blendMode))
+			{
+				await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.ErrorOccured);
+				return;
+			}
+
+			_userSettingsService.SetBlendModeForUser(userId, blendMode);
+			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+			return;
+		}
+
+		var markup = Utilities.BuildKeyboard(
+			3,
+			Enum.GetNames<BlendMode>()
+				.Select(name => new InlineKeyboardButton(name, $"SETTINGS_BLENDMODE_{name}")),
+			new InlineKeyboardButton(Localization.GoBack, "SETTINGS"));
+
+		await _telegramBotClient.EditMessageText(userId, messageId, Localization.SelectBlendMode, replyMarkup: markup);
+		await _telegramBotClient.AnswerCallbackQuery(callbackId);
+	}
+
+	private async Task ProcessFlagCallback(long userId, int messageId, string callbackId, string? argument)
+	{
+		if (argument != null)
+		{
+			if (!_flagImageService.IsValidFlagName(argument))
+			{
+				await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.ErrorOccured);
+				return;
+			}
+
+			_userSettingsService.SetFlagForUser(userId, argument);
+			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+			return;
+		}
+
+		var markup = Utilities.BuildKeyboard(
+			3,
+			_flagImageService.GetFlagNames()
+#pragma warning disable CA1304 // Specify CultureInfo -- it is set per-thread
+				.Select(name => new InlineKeyboardButton(Localization.ResourceManager.GetString(name)!, $"SETTINGS_FLAG_{name}"))
+#pragma warning restore CA1304 // Specify CultureInfo
+				.OrderBy(button => button.Text),
+			new InlineKeyboardButton(Localization.GoBack, "SETTINGS"));
+
+		await _telegramBotClient.EditMessageText(userId, messageId, Localization.SelectFlag, replyMarkup: markup);
+		await _telegramBotClient.AnswerCallbackQuery(callbackId);
+	}
+
+	private async Task ProcessOpacityCallback(long userId, int messageId, string callbackId, string? argument)
+	{
+		if (argument != null)
+		{
+			if (!byte.TryParse(argument, out var opacity) || opacity is >= 100 or <= 0)
+			{
+				await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.ErrorOccured);
+
+				return;
+			}
+
+			_userSettingsService.SetOpacityForUser(userId, opacity);
+			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+
+			return;
+		}
+
+		var markup = Utilities.BuildKeyboard(
+			3,
+			Enumerable.Range(1, 9).Select(x => x * 10)
+				.Select(opacity => new InlineKeyboardButton($"{opacity}%", $"SETTINGS_OPACITY_{opacity}")),
+			new InlineKeyboardButton(Localization.GoBack, "SETTINGS"));
+
+		await _telegramBotClient.EditMessageText(userId, messageId, Localization.SelectOpacity, replyMarkup: markup);
+		await _telegramBotClient.AnswerCallbackQuery(callbackId);
 	}
 
 	public async Task OnMessage(Message message)
@@ -145,6 +240,9 @@ internal sealed partial class Bot
 
 	[LoggerMessage(LogLevel.Error, "An error occurred while handling the message.")]
 	private partial void LogException(Exception ex);
+
+	[LoggerMessage(LogLevel.Error, "An error occurred while handling the callback query.")]
+	private partial void LogCallbackException(Exception ex);
 
 	private static void SetThreadLocale(string? languageCode)
 	{

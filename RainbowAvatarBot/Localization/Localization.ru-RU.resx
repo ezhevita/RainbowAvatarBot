@@ -126,9 +126,6 @@
 	<data name="Success" xml:space="preserve">
     <value>Успешно!</value>
   </data>
-	<data name="InvalidFlagName" xml:space="preserve">
-    <value>Неверное название флага!</value>
-  </data>
 	<data name="StartMessage" xml:space="preserve">
     <value>*Добро пожаловать в @RainbowAvatarBot\! 🏳️‍🌈*
 Отправь любое изображение/стикер, и я раскрашу его\!
@@ -155,14 +152,8 @@ _Разработала бота @ezhevita, я всегда готова выс�
     <value>Команду настроек нужно отправить в ЛС.</value>
   </data>
 	<data name="SelectFlag" xml:space="preserve">
-    <value>Выбери флаг:</value>
-  </data>
-	<data name="UnknownCommand" xml:space="preserve">
-    <value>Неизвестная команда!</value>
-  </data>
-	<data name="Processing" xml:space="preserve">
-    <value>Обработка...</value>
-  </data>
+		<value>Выбери флаг (по умолчанию — ЛГБТ):</value>
+	</data>
 	<data name="UnableToSend" xml:space="preserve">
     <value>Не получилось отправить результат! Пожалуйста, попробуй ещё раз или свяжись с разработчиком.</value>
   </data>
@@ -202,4 +193,25 @@ _Разработала бота @ezhevita, я всегда готова выс�
 	<data name="Transgender" xml:space="preserve">
     <value>Трансгендерный</value>
   </data>
+	<data name="SelectSettingToChange" xml:space="preserve">
+		<value>Выбери настройку для изменения:</value>
+	</data>
+	<data name="FlagSettings" xml:space="preserve">
+		<value>Флаг</value>
+	</data>
+	<data name="OpacitySettings" xml:space="preserve">
+		<value>Прозрачность</value>
+	</data>
+	<data name="GoBack" xml:space="preserve">
+		<value>Назад</value>
+	</data>
+	<data name="SelectOpacity" xml:space="preserve">
+		<value>Выбери прозрачность (по умолчанию — 50%):</value>
+	</data>
+	<data name="BlendModeSettings" xml:space="preserve">
+		<value>Режим смешения</value>
+	</data>
+	<data name="SelectBlendMode" xml:space="preserve">
+		<value>Выберите режим смешения (работает только для картинок и видео-стикеров, по умолчанию — HardLight):</value>
+	</data>
 </root>

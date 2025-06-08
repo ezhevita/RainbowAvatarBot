@@ -13,7 +13,6 @@ namespace RainbowAvatarBot.Processors;
 
 internal class VideoStickerProcessor : IProcessor
 {
-	private readonly OverlayVideoFilterArgument _overlayFfmpegArgument = new(0.5F, "hardlight");
 	private readonly RecyclableMemoryStreamManager _memoryStreamManager;
 
 	private const string videoCodec = "libvpx-vp9";
@@ -25,7 +24,7 @@ internal class VideoStickerProcessor : IProcessor
 
 	public IEnumerable<MediaType> SupportedMediaTypes => [MediaType.VideoSticker];
 
-	public async Task<InputFileStream> Process(Stream input, string overlayName, bool isSticker)
+	public async Task<InputFileStream> Process(Stream input, UserSettings settings, bool isSticker)
 	{
 		if (!isSticker)
 		{
@@ -40,12 +39,12 @@ internal class VideoStickerProcessor : IProcessor
 		{
 			var ffMpegArguments = FFMpegArguments.FromPipeInput(
 					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec))
-				.AddFileInput(Path.Combine("images", overlayName + ".png"))
+				.AddFileInput(Path.Combine("images", settings.FlagName + ".png"))
 				.OutputToPipe(
 					new StreamPipeSink(resultStream), addArguments: options => options.ForceFormat(VideoType.WebM)
 						// This is necessary to make TGMac client use video resolution, otherwise it stretches height to 512
 						.WithDuration(TimeSpan.FromSeconds(3))
-						.WithArgument(_overlayFfmpegArgument));
+						.WithArgument(new OverlayVideoFilterArgument(settings.Opacity / 100.0f, settings.BlendMode)));
 
 			await ffMpegArguments.ProcessAsynchronously();
 

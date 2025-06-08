@@ -62,7 +62,7 @@ internal sealed partial class ColorizeCommand : ICommand
 			return null;
 		}
 
-		var overlayName = _userSettingsService.GetFlagForUser(senderID);
+		var settings = _userSettingsService.GetSettingsForUser(senderID);
 		var targetMessage = message switch
 		{
 			{ Type: MessageType.Text, ReplyToMessage: { Type: MessageType.Photo or MessageType.Sticker } reply } => reply,
@@ -97,8 +97,8 @@ internal sealed partial class ColorizeCommand : ICommand
 			_ => throw new InvalidOperationException()
 		};
 
-		if (_memoryCache.TryGetValue<string>(new { image.FileUniqueId, overlayName }, out var fileId) &&
-			!string.IsNullOrEmpty(fileId))
+		var cacheKey = new {image.FileUniqueId, settings};
+		if (_memoryCache.TryGetValue<string>(cacheKey, out var fileId) && !string.IsNullOrEmpty(fileId))
 		{
 			return new ResultMessage(new InputFileId(fileId), mediaType);
 		}
@@ -124,7 +124,7 @@ internal sealed partial class ColorizeCommand : ICommand
 		stream.Position = 0;
 
 		var sw = Stopwatch.StartNew();
-		var result = await processor.Process(stream, overlayName, mediaType.IsSticker());
+		var result = await processor.Process(stream, settings, mediaType.IsSticker());
 		sw.Stop();
 		LogProcessed(mediaType, sw.ElapsedMilliseconds);
 
