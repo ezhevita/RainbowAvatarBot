@@ -90,11 +90,11 @@ internal sealed partial class AvatarCommand : ICommand
 		var result = await processor.Process(stream, settings, false);
 
 		sw.Stop();
-		LogProcessed(sw.ElapsedMilliseconds);
+		LogProcessed(sw.ElapsedMilliseconds, senderID, message.Chat.Id);
 
 		return new ResultMessage(result, MediaType.Picture);
 	}
 
-	[LoggerMessage(LogLevel.Information, "Processed avatar in {ElapsedMilliseconds}ms")]
-	private partial void LogProcessed(long elapsedMilliseconds);
+	[LoggerMessage(LogLevel.Information, "Processed in {ElapsedMilliseconds}ms (sent by {UserId} in {ChatId})")]
+	private partial void LogProcessed(long elapsedMilliseconds, long userId, long chatId);
 }

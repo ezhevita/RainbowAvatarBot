@@ -46,18 +46,18 @@ internal sealed partial class ColorizeCommand : ICommand
 
 		return message switch
 		{
-			{ Type: MessageType.Text, ReplyToMessage.Type: MessageType.Photo or MessageType.Sticker, Text: { } text }
+			{Type: MessageType.Text, ReplyToMessage.Type: MessageType.Photo or MessageType.Sticker, Text: { } text}
 				when Utilities.IsMatchingCommand(text, Command) => true,
-			{ Type: MessageType.Photo or MessageType.Sticker, Caption: { } caption }
+			{Type: MessageType.Photo or MessageType.Sticker, Caption: { } caption}
 				when Utilities.IsMatchingCommand(caption, Command) => true,
-			{ Type: MessageType.Photo or MessageType.Sticker, Chat.Type: ChatType.Private } => true,
+			{Type: MessageType.Photo or MessageType.Sticker, Chat.Type: ChatType.Private} => true,
 			_ => false
 		};
 	}
 
 	public async Task<ResultMessage?> Execute(ITelegramBotClient botClient, Message message)
 	{
-		if (message is not { From.Id: var senderID })
+		if (message is not {From.Id: var senderID})
 		{
 			return null;
 		}
@@ -65,8 +65,8 @@ internal sealed partial class ColorizeCommand : ICommand
 		var settings = _userSettingsService.GetSettingsForUser(senderID);
 		var targetMessage = message switch
 		{
-			{ Type: MessageType.Text, ReplyToMessage: { Type: MessageType.Photo or MessageType.Sticker } reply } => reply,
-			{ Type: MessageType.Photo or MessageType.Sticker } => message,
+			{Type: MessageType.Text, ReplyToMessage: {Type: MessageType.Photo or MessageType.Sticker} reply} => reply,
+			{Type: MessageType.Photo or MessageType.Sticker} => message,
 			_ => null
 		};
 
@@ -77,9 +77,9 @@ internal sealed partial class ColorizeCommand : ICommand
 
 		FileBase? image = targetMessage switch
 		{
-			{ Type: MessageType.Photo, Photo: { Length: > 0 } photoSizes } =>
+			{Type: MessageType.Photo, Photo: {Length: > 0} photoSizes} =>
 				photoSizes.MaxBy(size => size.Height)!,
-			{ Type: MessageType.Sticker, Sticker: { } sticker } => sticker,
+			{Type: MessageType.Sticker, Sticker: { } sticker} => sticker,
 			_ => null
 		};
 
@@ -90,8 +90,8 @@ internal sealed partial class ColorizeCommand : ICommand
 
 		var mediaType = image switch
 		{
-			Sticker { IsAnimated: true } => MediaType.AnimatedSticker,
-			Sticker { IsVideo: true } => MediaType.VideoSticker,
+			Sticker {IsAnimated: true} => MediaType.AnimatedSticker,
+			Sticker {IsVideo: true} => MediaType.VideoSticker,
 			Sticker => MediaType.Sticker,
 			PhotoSize => MediaType.Picture,
 			_ => throw new InvalidOperationException()
@@ -126,14 +126,14 @@ internal sealed partial class ColorizeCommand : ICommand
 		var sw = Stopwatch.StartNew();
 		var result = await processor.Process(stream, settings, mediaType.IsSticker());
 		sw.Stop();
-		LogProcessed(mediaType, sw.ElapsedMilliseconds);
+		LogProcessed(mediaType, sw.ElapsedMilliseconds, senderID, message.Chat.Id);
 
 		return new ResultMessage(
 			mediaType == MediaType.VideoSticker ? await ReplaceWithAddedSticker(botClient, result) : result, mediaType);
 	}
 
-	[LoggerMessage(LogLevel.Information, "Processed {MediaType} in {ElapsedMilliseconds}ms")]
-	private partial void LogProcessed(MediaType mediaType, long elapsedMilliseconds);
+	[LoggerMessage(LogLevel.Information, "Processed {MediaType} in {ElapsedMilliseconds}ms (sent by {UserId} in {ChatId})")]
+	private partial void LogProcessed(MediaType mediaType, long elapsedMilliseconds, long userId, long chatId);
 
 	// This is necessary in order to properly show video stickers on Telegram Desktop, otherwise it is displayed as a file.
 	private async Task<InputFile> ReplaceWithAddedSticker(ITelegramBotClient botClient, InputFileStream file)
