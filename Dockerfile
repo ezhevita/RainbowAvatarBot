@@ -11,9 +11,9 @@ RUN apk add --update \
   coreutils \
   gcc \
   libvpx-dev \
+  nasm \
   pkgconf \
   pkgconfig \
-  yasm \
   zlib-dev
 
 RUN cd /tmp/ && \
