@@ -1,6 +1,6 @@
 # Based on https://github.com/alfg/docker-ffmpeg
 FROM alpine:3.21.0 AS ffmpeg-build
-ARG FFMPEG_VERSION=7.1.1
+ARG FFMPEG_VERSION=8.1.1
 ARG PREFIX=/opt/ffmpeg
 ARG LD_LIBRARY_PATH=/opt/ffmpeg/lib
 ARG MAKEFLAGS="-j4"
@@ -41,12 +41,12 @@ RUN cd /tmp/ffmpeg-${FFMPEG_VERSION} && \
   --prefix="${PREFIX}" && \
   make && make install
 
-FROM mcr.microsoft.com/dotnet/runtime:9.0-alpine AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache icu-libs
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 COPY ["Directory.Build.props", "."]
 COPY ["RainbowAvatarBot/RainbowAvatarBot.csproj", "RainbowAvatarBot/"]

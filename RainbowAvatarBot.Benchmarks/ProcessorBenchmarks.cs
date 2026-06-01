@@ -14,11 +14,11 @@ using SixLabors.ImageSharp;
 namespace RainbowAvatarBot.Benchmarks;
 
 [SimpleJob]
-internal sealed class ProcessorBenchmarks
+public class ProcessorBenchmarks
 {
-	private Stream _animatedStickerInput = null!;
-	private Stream _imageStickerInput = null!;
-	private Stream _videoStickerInput = null!;
+	private UnclosableMemoryStream _animatedStickerInput = null!;
+	private UnclosableMemoryStream _imageStickerInput = null!;
+	private UnclosableMemoryStream _videoStickerInput = null!;
 	private AnimatedStickerProcessor _animatedStickerProcessor = null!;
 	private ImageProcessor _imageStickerProcessor = null!;
 	private VideoStickerProcessor _videoStickerProcessor = null!;

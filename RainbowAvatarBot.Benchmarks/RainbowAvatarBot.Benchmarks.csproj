@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<NoWarn>$(NoWarn);CS8618;CA1001;CA2000</NoWarn>
+		<NoWarn>$(NoWarn);CS8618;CA1001;CA2000;CA1515;CA1812</NoWarn>
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\RainbowAvatarBot\RainbowAvatarBot.csproj" />
-		<PackageReference Include="BenchmarkDotNet" Version="0.15.0" />
+		<PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
 	</ItemGroup>
 	
 	<ItemGroup>

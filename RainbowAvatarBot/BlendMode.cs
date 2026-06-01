@@ -4,7 +4,9 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace RainbowAvatarBot;
 
 // Names must correspond to the FFMpeg's blending mode names (case-insensitive)
-internal enum BlendMode
+#pragma warning disable CA1515 // Consider making public types internal -- neccessary for benchmarks
+public enum BlendMode
+#pragma warning restore CA1515 // Consider making public types
 {
 	Normal,
 	Multiply,

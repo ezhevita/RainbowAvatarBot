@@ -1,6 +1,8 @@
 namespace RainbowAvatarBot;
 
-internal sealed record UserSettings
+#pragma warning disable CA1515 // Consider making public types internal -- necessary for benchmarks
+public sealed record UserSettings
+#pragma warning restore CA1515 // Consider making public types internal
 {
 	public string FlagName { get; set; } = "LGBT";
 	public byte Opacity { get; set; } = 50;

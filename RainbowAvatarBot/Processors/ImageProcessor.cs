@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.IO;
 using RainbowAvatarBot.Services;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -19,7 +20,7 @@ internal class ImageProcessor : IProcessor
 	{
 		ColorType = PngColorType.RgbWithAlpha,
 		CompressionLevel = PngCompressionLevel.NoCompression,
-		TransparentColorMode = PngTransparentColorMode.Clear
+		TransparentColorMode = TransparentColorMode.Clear
 	};
 
 	private readonly WebpEncoder _webpEncoder = new()

@@ -16,6 +16,7 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Color = SixLabors.ImageSharp.Color;
 
 namespace RainbowAvatarBot.Services;
 
@@ -119,9 +120,9 @@ internal sealed class InitializationHostedService : IHostedService
 		{
 			var color = colors[i];
 			var argbValue = new Argb32((byte)(color >> 16), (byte)((color >> 8) & 0xFF), (byte)(color & 0xFF));
-			var shape = new RectangleF(0, i, 1, 1);
+			var shape = new Rectangle(0, i, 1, 1);
 
-			image.Mutate(img => img.Fill(argbValue, shape));
+			image.Mutate(img => img.Paint(canvas => canvas.Fill(Brushes.Solid(Color.FromPixel(argbValue)), shape)));
 		}
 
 		await image.SaveAsPngAsync(Path.Combine("images", name + ".png"), _pngEncoder, cancellationToken: cancellationToken);
