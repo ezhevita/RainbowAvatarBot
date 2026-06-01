@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.IO;
 using RainbowAvatarBot.Services;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -16,11 +15,10 @@ namespace RainbowAvatarBot.Processors;
 
 internal class ImageProcessor : IProcessor
 {
-	private readonly PngEncoder _pngEncoder = new()
+	private readonly JpegEncoder _jpegEncoder = new()
 	{
-		ColorType = PngColorType.RgbWithAlpha,
-		CompressionLevel = PngCompressionLevel.NoCompression,
-		TransparentColorMode = TransparentColorMode.Clear
+		ColorType = JpegColorType.Rgb,
+		Quality = 50
 	};
 
 	private readonly WebpEncoder _webpEncoder = new()
@@ -62,8 +60,8 @@ internal class ImageProcessor : IProcessor
 		}
 		else
 		{
-			await image.SaveAsPngAsync(result, _pngEncoder);
-			fileName = "picture.png";
+			await image.SaveAsJpegAsync(result, _jpegEncoder);
+			fileName = "picture.jpg";
 		}
 
 		result.Position = 0;
