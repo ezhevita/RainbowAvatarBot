@@ -7,6 +7,7 @@ using Microsoft.IO;
 using RainbowAvatarBot.Processors;
 using RainbowAvatarBot.Services;
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
@@ -59,15 +60,14 @@ internal sealed partial class AvatarCommand : ICommand
 			userIdForAvatars = senderID;
 		}
 
-		var avatars = await botClient.GetUserProfilePhotos(userIdForAvatars, limit: 1);
-		if (avatars.Photos.Length == 0)
+		var avatar = await GetUserAvatar(botClient, userIdForAvatars);
+		if (avatar is null)
 		{
 			return new ResultMessage(
 				isReplied ? Localization.RepliedUserProfilePictureNotFound : Localization.UserProfilePictureNotFound);
 		}
 
-		var sourceImage = avatars.Photos.Single().MaxBy(photo => photo.Height)!;
-		var cacheKey = new {sourceImage.FileUniqueId, settings};
+		var cacheKey = new {avatar.FileUniqueId, settings};
 		if (_memoryCache.TryGetValue<string>(cacheKey, out var fileId) && !string.IsNullOrEmpty(fileId))
 		{
 			return new ResultMessage(new InputFileId(fileId), MediaType.Picture);
@@ -81,7 +81,7 @@ internal sealed partial class AvatarCommand : ICommand
 		}
 
 		await botClient.SendChatAction(message.Chat, ChatAction.UploadPhoto);
-		var file = await botClient.GetFile(sourceImage.FileId);
+		var file = await botClient.GetFile(avatar.FileId);
 		await using var stream = _streamManager.GetStream(nameof(AvatarCommand), file.FileSize ?? 256 * 1024);
 		await botClient.DownloadFile(file, stream);
 		stream.Position = 0;
@@ -93,6 +93,32 @@ internal sealed partial class AvatarCommand : ICommand
 		LogProcessed(sw.ElapsedMilliseconds, senderID, message.Chat.Id);
 
 		return new ResultMessage(result, MediaType.Picture);
+	}
+
+	private static async Task<FileBase?> GetUserAvatar(ITelegramBotClient botClient, long userId)
+	{
+		var avatars = await botClient.GetUserProfilePhotos(userId, limit: 1);
+		if (avatars.Photos is [var avatarPhoto])
+		{
+			return avatarPhoto.MaxBy(photo => photo.Height)!;
+		}
+
+		ChatFullInfo chatInfo;
+		try
+		{
+			chatInfo = await botClient.GetChat(userId);
+		}
+		catch (ApiRequestException)
+		{
+			return null;
+		}
+
+		if (chatInfo.Photo is { } chatPhoto)
+		{
+			return new PhotoSize {FileId = chatPhoto.BigFileId, FileUniqueId = chatPhoto.BigFileUniqueId};
+		}
+
+		return null;
 	}
 
 	[LoggerMessage(LogLevel.Information, "Processed in {ElapsedMilliseconds}ms (sent by {UserId} in {ChatId})")]
