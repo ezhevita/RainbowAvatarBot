@@ -38,8 +38,7 @@ internal class VideoStickerProcessor : IProcessor
 		try
 		{
 			var ffMpegArguments = FFMpegArguments.FromPipeInput(
-					new StreamPipeSource(input),
-					options => options.WithVideoCodec(videoCodec).WithArgument(new StrictArgument(StrictMode.Experimental)))
+					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec))
 				.AddFileInput(Path.Combine("images", settings.FlagName + ".png"))
 				.OutputToPipe(
 					new StreamPipeSink(resultStream), addArguments: options => options.ForceFormat(VideoType.WebM)
@@ -52,7 +51,8 @@ internal class VideoStickerProcessor : IProcessor
 			await using var resultFile = File.OpenRead(resultFileName);
 
 			await resultFile.CopyToAsync(resultStream);
-		} finally
+		}
+		finally
 		{
 			if (File.Exists(resultFileName))
 			{
