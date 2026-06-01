@@ -38,7 +38,8 @@ internal class VideoStickerProcessor : IProcessor
 		try
 		{
 			var ffMpegArguments = FFMpegArguments.FromPipeInput(
-					new StreamPipeSource(input), options => options.WithVideoCodec(videoCodec))
+					new StreamPipeSource(input),
+					options => options.WithVideoCodec(videoCodec).WithArgument(new StrictArgument(StrictMode.Experimental)))
 				.AddFileInput(Path.Combine("images", settings.FlagName + ".png"))
 				.OutputToPipe(
 					new StreamPipeSink(resultStream), addArguments: options => options.ForceFormat(VideoType.WebM)
