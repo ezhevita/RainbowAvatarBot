@@ -1,6 +1,6 @@
 # Based on https://github.com/alfg/docker-ffmpeg
-FROM alpine:3.23.4 AS ffmpeg-build
-ARG FFMPEG_VERSION=8.1.1
+FROM alpine:latest AS ffmpeg-build
+ARG FFMPEG_VERSION=9.0.1
 ARG PREFIX=/opt/ffmpeg
 ARG LD_LIBRARY_PATH=/opt/ffmpeg/lib
 ARG MAKEFLAGS="-j4"
