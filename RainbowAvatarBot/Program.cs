@@ -50,18 +50,18 @@ using var host = Host.CreateDefaultBuilder(args)
 			services.AddSingleton<RateLimitingService>();
 			services.AddSingleton<RecyclableMemoryStreamManager>();
 
-			services.AddScoped<BotUserData>();
+			services.AddSingleton<BotUserData>();
 			services.AddScoped<IUpdateHandler, UpdateHandler>();
 			services.AddScoped<ReceiverService>();
-			services.AddScoped<IProcessor, AnimatedStickerProcessor>();
-			services.AddScoped<IProcessor, ImageProcessor>();
-			services.AddScoped<IProcessor, VideoStickerProcessor>();
-			services.AddScoped<ProcessorHandler>();
-			services.AddScoped<ICommand, AvatarCommand>();
-			services.AddScoped<ICommand, ColorizeCommand>();
-			services.AddScoped<ICommand, SettingsCommand>();
-			services.AddScoped<ICommand, StartCommand>();
-			services.AddScoped<CommandHandler>();
+			services.AddSingleton<IProcessor, AnimatedStickerProcessor>();
+			services.AddSingleton<IProcessor, ImageProcessor>();
+			services.AddSingleton<IProcessor, VideoStickerProcessor>();
+			services.AddSingleton<ProcessorHandler>();
+			services.AddSingleton<ICommand, AvatarCommand>();
+			services.AddSingleton<ICommand, ColorizeCommand>();
+			services.AddSingleton<ICommand, SettingsCommand>();
+			services.AddSingleton<ICommand, StartCommand>();
+			services.AddSingleton<CommandHandler>();
 			services.AddSingleton<Bot>();
 
 			services.AddHostedService<InitializationHostedService>();
@@ -72,5 +72,10 @@ using var host = Host.CreateDefaultBuilder(args)
 
 await host.Services.GetRequiredService<UserSettingsService>().Initialize();
 await host.Services.GetRequiredService<Bot>().Init();
+
+using (var scope = host.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
+{
+	await scope.ServiceProvider.GetRequiredService<UserSettingsDbContext>().Database.MigrateAsync();
+}
 
 await host.RunAsync();

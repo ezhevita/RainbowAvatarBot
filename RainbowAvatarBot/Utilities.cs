@@ -54,18 +54,14 @@ internal static class Utilities
 		return new InlineKeyboardMarkup(buttonRows);
 	}
 
-	public static InlineKeyboardMarkup BuildSettingsKeyboard(bool enableBlendModes)
+	public static InlineKeyboardMarkup BuildSettingsKeyboard()
 	{
 		var buttons = new List<InlineKeyboardButton>(
 		[
 			new InlineKeyboardButton(Localization.FlagSettings, "SETTINGS_FLAG"),
-			new InlineKeyboardButton(Localization.OpacitySettings, "SETTINGS_OPACITY")
+			new InlineKeyboardButton(Localization.OpacitySettings, "SETTINGS_OPACITY"),
+			new InlineKeyboardButton(Localization.BlendModeSettings, "SETTINGS_BLENDMODE")
 		]);
-
-		if (enableBlendModes)
-		{
-			buttons.Add(new InlineKeyboardButton(Localization.BlendModeSettings, "SETTINGS_BLENDMODE"));
-		}
 
 		return new InlineKeyboardMarkup(buttons);
 	}

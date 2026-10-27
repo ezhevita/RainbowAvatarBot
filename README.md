@@ -22,6 +22,11 @@ defaults: LGBT flag, 50% opacity, and HardLight blending. Every settings change 
 committed before the bot confirms it; concurrent changes to different settings
 do not overwrite each other.
 
+User IDs use PostgreSQL `bigint`, constrained to `1` through `4503599627370495`
+(`2^52 - 1`), following the [Bot API's 52-bit limit](https://core.telegram.org/bots/api#user).
+New databases and JSON imports into new tables enforce this constraint
+automatically.
+
 ### Import existing settings
 
 Stop the old bot and back up `data/config.json`. Before starting the new bot, use

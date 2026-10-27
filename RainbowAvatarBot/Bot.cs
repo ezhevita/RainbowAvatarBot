@@ -97,7 +97,7 @@ internal sealed partial class Bot
 		{
 			await _telegramBotClient.EditMessageText(
 				senderId, messageId, Localization.SelectSettingToChange,
-				replyMarkup: Utilities.BuildSettingsKeyboard(_botConfiguration.EnableBlendModeSettings));
+				replyMarkup: Utilities.BuildSettingsKeyboard());
 			await _telegramBotClient.AnswerCallbackQuery(callbackId);
 
 			return;

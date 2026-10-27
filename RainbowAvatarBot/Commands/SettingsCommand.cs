@@ -1,6 +1,4 @@
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using RainbowAvatarBot.Configuration;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -10,12 +8,7 @@ namespace RainbowAvatarBot.Commands;
 
 internal sealed class SettingsCommand : ICommand
 {
-	private readonly InlineKeyboardMarkup _keyboard;
-
-	public SettingsCommand(IOptions<BotConfiguration> botSettings)
-	{
-		_keyboard = Utilities.BuildSettingsKeyboard(botSettings.Value.EnableBlendModeSettings);
-	}
+	private readonly InlineKeyboardMarkup _keyboard = Utilities.BuildSettingsKeyboard();
 
 	public bool CanExecute(Message message)
 	{
