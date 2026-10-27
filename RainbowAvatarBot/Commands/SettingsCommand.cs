@@ -2,14 +2,11 @@ using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace RainbowAvatarBot.Commands;
 
 internal sealed class SettingsCommand : ICommand
 {
-	private readonly InlineKeyboardMarkup _keyboard = Utilities.BuildSettingsKeyboard();
-
 	public bool CanExecute(Message message)
 	{
 		return message is
@@ -24,6 +21,6 @@ internal sealed class SettingsCommand : ICommand
 			return Task.FromResult(new ResultMessage(Localization.SettingsSentToChat))!;
 		}
 
-		return Task.FromResult(new ResultMessage(Localization.SelectSettingToChange, markup: _keyboard))!;
+		return Task.FromResult(new ResultMessage(Localization.SelectSettingToChange, markup: Utilities.BuildSettingsKeyboard()))!;
 	}
 }
