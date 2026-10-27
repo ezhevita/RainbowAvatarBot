@@ -46,12 +46,6 @@ internal sealed class UserSettingsService
 		return UpdateSettingAsync(userId, settings => settings.Opacity = value);
 	}
 
-	public async Task Initialize()
-	{
-		await using var context = await _contextFactory.CreateDbContextAsync();
-		await context.Database.EnsureCreatedAsync();
-	}
-
 	private async Task UpdateSettingAsync(long userId, Action<UserSettingsEntity> update)
 	{
 		await using var context = await _contextFactory.CreateDbContextAsync();

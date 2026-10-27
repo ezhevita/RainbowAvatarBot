@@ -70,7 +70,6 @@ using var host = Host.CreateDefaultBuilder(args)
 	)
 	.Build();
 
-await host.Services.GetRequiredService<UserSettingsService>().Initialize();
 await host.Services.GetRequiredService<Bot>().Init();
 
 using (var scope = host.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
