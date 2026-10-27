@@ -13,7 +13,6 @@ buildDotnetModule rec {
         (lib.fileset.unions (map lib.fileset.maybeMissing [
           ../RainbowAvatarBot/bin
           ../RainbowAvatarBot/obj
-          ../RainbowAvatarBot/data
           ../RainbowAvatarBot/images
         ])))
     ];
