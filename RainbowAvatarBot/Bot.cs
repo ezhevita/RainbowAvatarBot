@@ -138,7 +138,7 @@ internal sealed partial class Bot
 				return;
 			}
 
-			_userSettingsService.SetBlendModeForUser(userId, blendMode);
+			await _userSettingsService.SetBlendModeForUserAsync(userId, blendMode);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
 			return;
 		}
@@ -163,7 +163,7 @@ internal sealed partial class Bot
 				return;
 			}
 
-			_userSettingsService.SetFlagForUser(userId, argument);
+			await _userSettingsService.SetFlagForUserAsync(userId, argument);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
 			return;
 		}
@@ -192,7 +192,7 @@ internal sealed partial class Bot
 				return;
 			}
 
-			_userSettingsService.SetOpacityForUser(userId, opacity);
+			await _userSettingsService.SetOpacityForUserAsync(userId, opacity);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
 
 			return;

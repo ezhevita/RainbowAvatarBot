@@ -31,14 +31,14 @@ internal sealed class InitializationHostedService : IHostedService
 	private readonly IOptions<ProcessingConfiguration> _processingOptions;
 	private readonly IOptions<BotConfiguration> _botOptions;
 	private readonly ITelegramBotClient _botClient;
-	private readonly UserSettingsService _settingsService;
 	private readonly BotUserData _botUserData;
 	private readonly Dictionary<string, Image> _flagImages;
 
-	public InitializationHostedService(ITelegramBotClient botClient, UserSettingsService settingsService, BotUserData botUserData, Dictionary<string, Image> flagImages, IOptions<ProcessingConfiguration> processingOptions, IOptions<BotConfiguration> botOptions)
+	public InitializationHostedService(ITelegramBotClient botClient, BotUserData botUserData,
+		Dictionary<string, Image> flagImages, IOptions<ProcessingConfiguration> processingOptions,
+		IOptions<BotConfiguration> botOptions)
 	{
 		_botClient = botClient;
-		_settingsService = settingsService;
 		_botUserData = botUserData;
 		_flagImages = flagImages;
 		_processingOptions = processingOptions;
@@ -55,7 +55,7 @@ internal sealed class InitializationHostedService : IHostedService
 		_botUserData.Username = (await _botClient.GetMe(cancellationToken: cancellationToken)).Username!;
 
 		await Task.WhenAll(
-			InitializeStickerSet(cancellationToken), InitializeImages(cancellationToken), _settingsService.Initialize());
+			InitializeStickerSet(cancellationToken), InitializeImages(cancellationToken));
 	}
 
 	internal async Task InitializeImages(CancellationToken cancellationToken)
@@ -119,7 +119,7 @@ internal sealed class InitializationHostedService : IHostedService
 		for (var i = 0; i < colors.Count; i++)
 		{
 			var color = colors[i];
-			var argbValue = new Argb32((byte)(color >> 16), (byte)((color >> 8) & 0xFF), (byte)(color & 0xFF));
+			var argbValue = new Argb32((byte) (color >> 16), (byte) ((color >> 8) & 0xFF), (byte) (color & 0xFF));
 			var shape = new Rectangle(0, i, 1, 1);
 
 			image.Mutate(img => img.Paint(canvas => canvas.Fill(Brushes.Solid(Color.FromPixel(argbValue)), shape)));

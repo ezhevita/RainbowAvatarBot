@@ -45,7 +45,7 @@ internal sealed partial class AvatarCommand : ICommand
 			return null;
 		}
 
-		var settings = _userSettingsService.GetSettingsForUser(senderID);
+		var settings = await _userSettingsService.GetSettingsForUserAsync(senderID);
 
 		bool isReplied;
 		long userIdForAvatars;

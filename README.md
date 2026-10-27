@@ -4,7 +4,8 @@ Telegram bot for adding pride flags to avatars, stickers and images.
 
 ## PostgreSQL
 
-User settings are stored in PostgreSQL. Create a database and role for the bot,
+User settings are stored in PostgreSQL through EF Core and its Npgsql provider.
+Create a dedicated database and role for the bot,
 then configure the connection string through the environment (for Nix, Docker,
 and `dotnet run`):
 
@@ -12,7 +13,9 @@ and `dotnet run`):
 export ConnectionStrings__PostgreSQL='Host=localhost;Database=rainbow_avatar_bot;Username=rainbow_avatar_bot;Password=your-password'
 ```
 
-The bot creates its `user_settings` table before connecting to Telegram. The role
+The bot initializes an empty database with EF Core's `EnsureCreatedAsync` before
+connecting to Telegram. Existing settings tables, including JSON imports, remain
+compatible. Schema changes are not automatically migrated. The role
 needs permission to create tables in its schema and read/write the table. Missing
 configuration or an unavailable database stops startup. New users retain the
 defaults: LGBT flag, 50% opacity, and HardLight blending. Every settings change is

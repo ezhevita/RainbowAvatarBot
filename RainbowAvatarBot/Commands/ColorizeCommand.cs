@@ -62,7 +62,7 @@ internal sealed partial class ColorizeCommand : ICommand
 			return null;
 		}
 
-		var settings = _userSettingsService.GetSettingsForUser(senderID);
+		var settings = await _userSettingsService.GetSettingsForUserAsync(senderID);
 		var targetMessage = message switch
 		{
 			{Type: MessageType.Text, ReplyToMessage: {Type: MessageType.Photo or MessageType.Sticker} reply} => reply,

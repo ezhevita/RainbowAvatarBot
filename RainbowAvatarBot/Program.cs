@@ -35,6 +35,16 @@ var host = Host.CreateDefaultBuilder(args)
 			services.AddSingleton(TimeProvider.System);
 			services.AddSingleton<Dictionary<string, Image>>();
 			services.AddSingleton<FlagImageService>();
+			services.AddPooledDbContextFactory<UserSettingsDbContext>(options =>
+			{
+				var connectionString = context.Configuration.GetConnectionString("PostgreSQL");
+				if (string.IsNullOrWhiteSpace(connectionString))
+				{
+					throw new InvalidOperationException("Configure ConnectionStrings:PostgreSQL before starting the bot.");
+				}
+
+				options.UseNpgsql(connectionString);
+			});
 			services.AddSingleton<UserSettingsService>();
 			services.AddSingleton<RateLimitingService>();
 			services.AddSingleton<RecyclableMemoryStreamManager>();
@@ -59,6 +69,7 @@ var host = Host.CreateDefaultBuilder(args)
 	)
 	.Build();
 
+await host.Services.GetRequiredService<UserSettingsService>().Initialize();
 await host.Services.GetRequiredService<Bot>().Init();
 
 await host.RunAsync();
