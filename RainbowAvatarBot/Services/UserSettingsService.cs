@@ -50,9 +50,10 @@ internal sealed class UserSettingsService
 	{
 		await using var context = await _contextFactory.CreateDbContextAsync();
 		var settings = await context.UserSettings.FindAsync(userId);
-		var isNew = settings is null;
+		bool isNew = false;
 		if (settings is null)
 		{
+			isNew = true;
 			settings = new UserSettingsEntity {UserId = userId};
 			context.UserSettings.Add(settings);
 		}
