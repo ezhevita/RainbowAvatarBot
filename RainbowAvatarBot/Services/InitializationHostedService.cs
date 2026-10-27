@@ -97,7 +97,7 @@ internal sealed class InitializationHostedService : IHostedService
 			try
 			{
 				await using var fileStream = File.Open(
-					Path.Combine("Assets", "sticker.webp"), FileMode.Open, FileAccess.Read, FileShare.Read);
+					Path.Combine(AppContext.BaseDirectory, "Assets", "sticker.webp"), FileMode.Open, FileAccess.Read, FileShare.Read);
 
 				var sticker = new InputSticker(
 					new InputFileStream(fileStream, "sticker.webp"), StickerFormat.Static, ["🌈", "🏳️‍🌈"]);
