@@ -88,7 +88,7 @@ internal sealed partial class Bot
 	{
 		SetThreadLocale(callbackQuery.From.LanguageCode);
 
-		if (callbackQuery is not { Id: { } callbackId, From.Id: var senderId, Data: { } data, Message.Id: { } messageId })
+		if (callbackQuery is not {Id: { } callbackId, From.Id: var senderId, Data: { } data, Message.Id: { } messageId})
 		{
 			return;
 		}
@@ -97,7 +97,7 @@ internal sealed partial class Bot
 		{
 			await _telegramBotClient.EditMessageText(
 				senderId, messageId, Localization.SelectSettingToChange,
-				replyMarkup: Utilities.BuildSettingsKeyboard(_botConfiguration.EnableBlendModeSettings));
+				replyMarkup: Utilities.BuildSettingsKeyboard());
 			await _telegramBotClient.AnswerCallbackQuery(callbackId);
 
 			return;
@@ -122,7 +122,8 @@ internal sealed partial class Bot
 			};
 
 			await processTask;
-		} catch (Exception e)
+		}
+		catch (Exception e)
 		{
 			LogCallbackException(e);
 		}
@@ -135,11 +136,13 @@ internal sealed partial class Bot
 			if (!Enum.TryParse<BlendMode>(argument, true, out var blendMode) || !Enum.IsDefined(blendMode))
 			{
 				await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.ErrorOccured);
+
 				return;
 			}
 
-			_userSettingsService.SetBlendModeForUser(userId, blendMode);
+			await _userSettingsService.SetBlendModeForUserAsync(userId, blendMode);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+
 			return;
 		}
 
@@ -160,11 +163,13 @@ internal sealed partial class Bot
 			if (!_flagImageService.IsValidFlagName(argument))
 			{
 				await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.ErrorOccured);
+
 				return;
 			}
 
-			_userSettingsService.SetFlagForUser(userId, argument);
+			await _userSettingsService.SetFlagForUserAsync(userId, argument);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
+
 			return;
 		}
 
@@ -192,7 +197,7 @@ internal sealed partial class Bot
 				return;
 			}
 
-			_userSettingsService.SetOpacityForUser(userId, opacity);
+			await _userSettingsService.SetOpacityForUserAsync(userId, opacity);
 			await _telegramBotClient.AnswerCallbackQuery(callbackId, Localization.Success);
 
 			return;
@@ -210,7 +215,7 @@ internal sealed partial class Bot
 
 	public async Task OnMessage(Message message)
 	{
-		if (message is not { From: not null, Chat.Id: var chatID })
+		if (message is not {From: not null, Chat.Id: var chatID})
 		{
 			return;
 		}
@@ -229,7 +234,8 @@ internal sealed partial class Bot
 
 			try
 			{
-				await _telegramBotClient.SendMessage(chatID, Localization.ErrorOccured, replyParameters: new ReplyParameters { MessageId = message.Id });
+				await _telegramBotClient.SendMessage(
+					chatID, Localization.ErrorOccured, replyParameters: new ReplyParameters {MessageId = message.Id});
 			}
 			catch
 			{

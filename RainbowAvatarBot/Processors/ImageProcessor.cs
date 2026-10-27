@@ -43,7 +43,7 @@ internal class ImageProcessor : IProcessor
 	{
 		var image = await Image.LoadAsync(input);
 		using (var resized = _flagImageService.GetFlag(settings.FlagName)
-				   .Clone(img => img.Resize(image.Width, image.Height, new NearestNeighborResampler())))
+			       .Clone(img => img.Resize(image.Width, image.Height, new NearestNeighborResampler())))
 		{
 			// ReSharper disable once AccessToDisposedClosure
 			image.Mutate(img => img.DrawImage(
@@ -65,6 +65,7 @@ internal class ImageProcessor : IProcessor
 		}
 
 		result.Position = 0;
+
 		return new InputFileStream(result, fileName);
 	}
 }

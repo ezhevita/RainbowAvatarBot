@@ -23,7 +23,8 @@ internal sealed partial class AvatarCommand : ICommand
 	private readonly ILogger<AvatarCommand> _logger;
 
 	public AvatarCommand(UserSettingsService userSettingsService, RateLimitingService rateLimitingService,
-		ProcessorHandler processorHandler, IMemoryCache memoryCache, RecyclableMemoryStreamManager streamManager, ILogger<AvatarCommand> logger)
+		ProcessorHandler processorHandler, IMemoryCache memoryCache, RecyclableMemoryStreamManager streamManager,
+		ILogger<AvatarCommand> logger)
 	{
 		_userSettingsService = userSettingsService;
 		_rateLimitingService = rateLimitingService;
@@ -35,21 +36,21 @@ internal sealed partial class AvatarCommand : ICommand
 
 	public bool CanExecute(Message message)
 	{
-		return message is { Type: MessageType.Text, Text: { } text } && Utilities.IsMatchingCommand(text, "/avatar");
+		return message is {Type: MessageType.Text, Text: { } text} && Utilities.IsMatchingCommand(text, "/avatar");
 	}
 
 	public async Task<ResultMessage?> Execute(ITelegramBotClient botClient, Message message)
 	{
-		if (message is not { From.Id: var senderID })
+		if (message is not {From.Id: var senderID})
 		{
 			return null;
 		}
 
-		var settings = _userSettingsService.GetSettingsForUser(senderID);
+		var settings = await _userSettingsService.GetSettingsForUserAsync(senderID);
 
 		bool isReplied;
 		long userIdForAvatars;
-		if (message is { ReplyToMessage.From.Id: var repliedId })
+		if (message is {ReplyToMessage.From.Id: var repliedId})
 		{
 			isReplied = true;
 			userIdForAvatars = repliedId;

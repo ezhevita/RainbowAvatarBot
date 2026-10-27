@@ -47,7 +47,7 @@ public class ProcessorBenchmarks
 
 		var options = new OptionsWrapper<ProcessingConfiguration>(configuration.Processing);
 		var images = new Dictionary<string, Image>();
-		var initService = new InitializationHostedService(null!, null!, null!, images, options, null!);
+		var initService = new InitializationHostedService(null!, null!, images, options, null!);
 		await initService.InitializeImages(CancellationToken.None);
 
 		_animatedStickerProcessor = new AnimatedStickerProcessor(options, memoryStreamManager);

@@ -18,7 +18,7 @@ internal sealed partial class CommandHandler
 	public CommandHandler(ITelegramBotClient botClient, IEnumerable<ICommand> commands, ILogger<CommandHandler> logger)
 	{
 		_botClient = botClient;
-		_commands = [.. commands];
+		_commands = [..commands];
 		_logger = logger;
 	}
 
@@ -38,6 +38,7 @@ internal sealed partial class CommandHandler
 		catch (Exception e)
 		{
 			LogCommandExecutionError(e);
+
 			throw new CommandExecutionException("Command execution failed.", e);
 		}
 
@@ -46,7 +47,7 @@ internal sealed partial class CommandHandler
 			return;
 		}
 
-		var replyParameters = new ReplyParameters { MessageId = message.Id };
+		var replyParameters = new ReplyParameters {MessageId = message.Id};
 		Task<Message?> task = (result switch
 		{
 			{Text: { } text} => _botClient.SendMessage(
@@ -66,7 +67,7 @@ internal sealed partial class CommandHandler
 
 		// Sometimes Telegram doesn't consider sent sticker a valid one (e.g. exceeding size limit).
 		// The only way to detect is to check response message whether it has a sticker set.
-		if (result is { MediaType: { } type } && type.IsSticker() && (response.Sticker == null))
+		if (result is {MediaType: { } type} && type.IsSticker() && (response.Sticker == null))
 		{
 			await _botClient.DeleteMessage(response.Chat, response.MessageId);
 			await _botClient.SendMessage(message.Chat.Id, Localization.UnableToSend, replyParameters: replyParameters);

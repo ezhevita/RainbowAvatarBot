@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -7,22 +9,21 @@ using Microsoft.IO;
 using RainbowAvatarBot;
 using RainbowAvatarBot.Commands;
 using RainbowAvatarBot.Configuration;
+using RainbowAvatarBot.Database;
 using RainbowAvatarBot.Processors;
 using RainbowAvatarBot.Services;
 using SixLabors.ImageSharp;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 
-var host = Host.CreateDefaultBuilder(args)
-	.ConfigureServices(
-		(context, services) =>
+using var host = Host.CreateDefaultBuilder(args)
+	.ConfigureServices((context, services) =>
 		{
 			services.Configure<BotConfiguration>(context.Configuration.GetSection("Bot"));
 			services.Configure<ProcessingConfiguration>(context.Configuration.GetSection("Processing"));
 
 			services.AddHttpClient("telegram_bot_client")
-				.AddTypedClient<ITelegramBotClient>(
-					(httpClient, sp) =>
+				.AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
 					{
 						var botConfig = sp.GetRequiredService<IOptions<BotConfiguration>>().Value;
 						var options = new TelegramBotClientOptions(botConfig.Token);
@@ -35,22 +36,32 @@ var host = Host.CreateDefaultBuilder(args)
 			services.AddSingleton(TimeProvider.System);
 			services.AddSingleton<Dictionary<string, Image>>();
 			services.AddSingleton<FlagImageService>();
+			services.AddPooledDbContextFactory<UserSettingsDbContext>(options =>
+			{
+				var connectionString = context.Configuration.GetConnectionString("PostgreSQL");
+				if (string.IsNullOrWhiteSpace(connectionString))
+				{
+					throw new InvalidOperationException("Configure ConnectionStrings:PostgreSQL before starting the bot.");
+				}
+
+				options.UseNpgsql(connectionString);
+			});
 			services.AddSingleton<UserSettingsService>();
 			services.AddSingleton<RateLimitingService>();
 			services.AddSingleton<RecyclableMemoryStreamManager>();
 
-			services.AddScoped<BotUserData>();
+			services.AddSingleton<BotUserData>();
 			services.AddScoped<IUpdateHandler, UpdateHandler>();
 			services.AddScoped<ReceiverService>();
-			services.AddScoped<IProcessor, AnimatedStickerProcessor>();
-			services.AddScoped<IProcessor, ImageProcessor>();
-			services.AddScoped<IProcessor, VideoStickerProcessor>();
-			services.AddScoped<ProcessorHandler>();
-			services.AddScoped<ICommand, AvatarCommand>();
-			services.AddScoped<ICommand, ColorizeCommand>();
-			services.AddScoped<ICommand, SettingsCommand>();
-			services.AddScoped<ICommand, StartCommand>();
-			services.AddScoped<CommandHandler>();
+			services.AddSingleton<IProcessor, AnimatedStickerProcessor>();
+			services.AddSingleton<IProcessor, ImageProcessor>();
+			services.AddSingleton<IProcessor, VideoStickerProcessor>();
+			services.AddSingleton<ProcessorHandler>();
+			services.AddSingleton<ICommand, AvatarCommand>();
+			services.AddSingleton<ICommand, ColorizeCommand>();
+			services.AddSingleton<ICommand, SettingsCommand>();
+			services.AddSingleton<ICommand, StartCommand>();
+			services.AddSingleton<CommandHandler>();
 			services.AddSingleton<Bot>();
 
 			services.AddHostedService<InitializationHostedService>();
@@ -60,5 +71,10 @@ var host = Host.CreateDefaultBuilder(args)
 	.Build();
 
 await host.Services.GetRequiredService<Bot>().Init();
+
+using (var scope = host.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
+{
+	await scope.ServiceProvider.GetRequiredService<UserSettingsDbContext>().Database.MigrateAsync();
+}
 
 await host.RunAsync();

@@ -1,100 +1,78 @@
 using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Text.Json;
-using System.Threading;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using RainbowAvatarBot.Database;
 
 namespace RainbowAvatarBot.Services;
 
-internal sealed class UserSettingsService : IDisposable
+internal sealed class UserSettingsService
 {
-	private readonly string _configLocation = Path.Combine("data", "config.json");
-	private readonly SemaphoreSlim _saveLock = new(1, 1);
-	private ConcurrentDictionary<long, UserSettings> _userSettings = new();
-	private bool _savingScheduled;
+	private readonly IDbContextFactory<UserSettingsDbContext> _contextFactory;
 
-	public UserSettings GetSettingsForUser(long userId)
+	public UserSettingsService(IDbContextFactory<UserSettingsDbContext> contextFactory)
 	{
-		_userSettings.TryGetValue(userId, out var value);
-		return value ?? new UserSettings();
+		_contextFactory = contextFactory;
 	}
 
-	public void SetBlendModeForUser(long userId, BlendMode value)
+	public async Task<UserSettings> GetSettingsForUserAsync(long userId)
 	{
-		if (_userSettings.TryGetValue(userId, out var userSettings))
-		{
-			userSettings.BlendMode = value;
-		} else
-		{
-			_userSettings.TryAdd(userId, new UserSettings {BlendMode = value});
-		}
+		await using var context = await _contextFactory.CreateDbContextAsync();
 
-		Task.Run(Save);
+		return await context.UserSettings.AsNoTracking()
+			.Where(settings => settings.UserId == userId)
+			.Select(settings => new UserSettings
+			{
+				FlagName = settings.FlagName,
+				Opacity = settings.Opacity,
+				BlendMode = settings.BlendMode
+			})
+			.SingleOrDefaultAsync() ?? new UserSettings();
 	}
 
-	public void SetFlagForUser(long userId, string value)
+	public Task SetBlendModeForUserAsync(long userId, BlendMode value)
 	{
-		if (_userSettings.TryGetValue(userId, out var userSettings))
-		{
-			userSettings.FlagName = value;
-		} else
-		{
-			_userSettings.TryAdd(userId, new UserSettings {FlagName = value});
-		}
-
-		Task.Run(Save);
+		return UpdateSettingAsync(userId, settings => settings.BlendMode = value);
 	}
 
-	public void SetOpacityForUser(long userId, byte value)
+	public Task SetFlagForUserAsync(long userId, string value)
 	{
-		if (_userSettings.TryGetValue(userId, out var userSettings))
-		{
-			userSettings.Opacity = value;
-		} else
-		{
-			_userSettings.TryAdd(userId, new UserSettings {Opacity = value});
-		}
+		return UpdateSettingAsync(userId, settings => settings.FlagName = value);
 	}
 
-	public async Task Initialize()
+	public Task SetOpacityForUserAsync(long userId, byte value)
 	{
-		if (File.Exists(_configLocation))
-		{
-			await using var configFile = File.OpenRead(_configLocation);
-			_userSettings = await JsonSerializer.DeserializeAsync<ConcurrentDictionary<long, UserSettings>>(configFile) ??
-				throw new InvalidOperationException("Settings are null");
-		}
-		else
-		{
-			Directory.CreateDirectory("data");
-			await Save();
-		}
+		return UpdateSettingAsync(userId, settings => settings.Opacity = value);
 	}
 
-	private async Task Save()
+	private async Task UpdateSettingAsync(long userId, Action<UserSettingsEntity> update)
 	{
-		if (Interlocked.Exchange(ref _savingScheduled, true))
+		await using var context = await _contextFactory.CreateDbContextAsync();
+		var settings = await context.UserSettings.FindAsync(userId);
+		bool isNew = false;
+		if (settings is null)
 		{
-			return;
+			isNew = true;
+			settings = new UserSettingsEntity {UserId = userId};
+			context.UserSettings.Add(settings);
 		}
 
-		await _saveLock.WaitAsync();
-
+		update(settings);
 		try
 		{
-			Interlocked.Exchange(ref _savingScheduled, false);
-			await using var configFile = File.Open(_configLocation, FileMode.Create, FileAccess.Write, FileShare.None);
-			await JsonSerializer.SerializeAsync(configFile, _userSettings);
+			await context.SaveChangesAsync();
 		}
-		finally
+		catch (DbUpdateException exception) when (isNew && exception.InnerException is PostgresException
+		                                          {
+			                                          SqlState: PostgresErrorCodes.UniqueViolation,
+			                                          ConstraintName: "user_settings_pkey"
+		                                          })
 		{
-			_saveLock.Release();
+			context.ChangeTracker.Clear();
+			settings = await context.UserSettings.SingleAsync(value => value.UserId == userId);
+			update(settings);
+			await context.SaveChangesAsync();
 		}
-	}
-
-	public void Dispose()
-	{
-		_saveLock.Dispose();
 	}
 }
