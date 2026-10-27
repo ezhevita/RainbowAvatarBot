@@ -20,7 +20,7 @@ internal sealed class SettingsCommand : ICommand
 	public bool CanExecute(Message message)
 	{
 		return message is
-		{ Chat.Type: ChatType.Private or ChatType.Group or ChatType.Supergroup, Type: MessageType.Text, Text: { } text } &&
+				{Chat.Type: ChatType.Private or ChatType.Group or ChatType.Supergroup, Type: MessageType.Text, Text: { } text} &&
 			Utilities.IsMatchingCommand(text, "/settings");
 	}
 

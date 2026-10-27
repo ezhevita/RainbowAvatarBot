@@ -27,7 +27,7 @@ internal sealed record ResultMessage : IDisposable
 
 	public void Dispose()
 	{
-		if (Media is InputFileStream { Content: { } stream })
+		if (Media is InputFileStream {Content: { } stream})
 		{
 			stream.Dispose();
 		}

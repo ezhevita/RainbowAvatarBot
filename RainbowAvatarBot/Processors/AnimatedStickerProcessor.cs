@@ -83,12 +83,12 @@ internal class AnimatedStickerProcessor : IProcessor
 		{
 			if (index > 0)
 			{
-				FillLine((byte)((index << 3) - 4), 0);
+				FillLine((byte) ((index << 3) - 4), 0);
 			}
 
 			if (index < rgbValues.Count - 1)
 			{
-				FillLine((byte)(index << 3), 1);
+				FillLine((byte) (index << 3), 1);
 			}
 
 			index++;
@@ -97,10 +97,10 @@ internal class AnimatedStickerProcessor : IProcessor
 
 			void FillLine(byte startIndex, byte indexInc)
 			{
-				gradientProps[startIndex] = (float)Math.Round((float)(index + indexInc) / rgbValues.Count, 3);
-				gradientProps[startIndex + 1] = (float)Math.Round((rgbValue >> 16) / 255.0, 3);
-				gradientProps[startIndex + 2] = (float)Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
-				gradientProps[startIndex + 3] = (float)Math.Round((rgbValue & 0xFF) / 255.0, 3);
+				gradientProps[startIndex] = (float) Math.Round((float) (index + indexInc) / rgbValues.Count, 3);
+				gradientProps[startIndex + 1] = (float) Math.Round((rgbValue >> 16) / 255.0, 3);
+				gradientProps[startIndex + 2] = (float) Math.Round(((rgbValue >> 8) & 0xFF) / 255.0, 3);
+				gradientProps[startIndex + 3] = (float) Math.Round((rgbValue & 0xFF) / 255.0, 3);
 			}
 		}
 
@@ -120,6 +120,7 @@ internal class AnimatedStickerProcessor : IProcessor
 		}
 
 		resultStream.Position = 0;
+
 		return resultStream;
 	}
 

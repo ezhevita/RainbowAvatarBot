@@ -26,6 +26,7 @@ internal sealed partial class RateLimitingService
 				if (record.Executing)
 				{
 					LogConcurrentRequest(userId);
+
 					return null;
 				}
 
@@ -33,6 +34,7 @@ internal sealed partial class RateLimitingService
 				if (elapsed <= _interval)
 				{
 					LogConcurrentRequest(userId);
+
 					return null;
 				}
 			}

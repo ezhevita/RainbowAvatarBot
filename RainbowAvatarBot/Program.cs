@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -7,22 +9,21 @@ using Microsoft.IO;
 using RainbowAvatarBot;
 using RainbowAvatarBot.Commands;
 using RainbowAvatarBot.Configuration;
+using RainbowAvatarBot.Database;
 using RainbowAvatarBot.Processors;
 using RainbowAvatarBot.Services;
 using SixLabors.ImageSharp;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 
-var host = Host.CreateDefaultBuilder(args)
-	.ConfigureServices(
-		(context, services) =>
+using var host = Host.CreateDefaultBuilder(args)
+	.ConfigureServices((context, services) =>
 		{
 			services.Configure<BotConfiguration>(context.Configuration.GetSection("Bot"));
 			services.Configure<ProcessingConfiguration>(context.Configuration.GetSection("Processing"));
 
 			services.AddHttpClient("telegram_bot_client")
-				.AddTypedClient<ITelegramBotClient>(
-					(httpClient, sp) =>
+				.AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
 					{
 						var botConfig = sp.GetRequiredService<IOptions<BotConfiguration>>().Value;
 						var options = new TelegramBotClientOptions(botConfig.Token);
