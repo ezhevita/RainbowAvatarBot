@@ -1,4 +1,4 @@
-{ lib, buildDotnetModule, dotnetCorePackages, ffmpeg }:
+{ lib, buildDotnetModule, dotnetCorePackages, ffmpeg-headless }:
 
 buildDotnetModule rec {
   pname = "rainbow-avatar-bot";
@@ -26,7 +26,7 @@ buildDotnetModule rec {
   executables = [ "RainbowAvatarBot" ];
 
   makeWrapperArgs = [
-    "--prefix PATH : ${lib.makeBinPath [ ffmpeg ]}"
+    "--prefix PATH : ${lib.makeBinPath [ ffmpeg-headless ]}"
     "--set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT false"
     "--add-flags --contentRoot"
     "--add-flags ${placeholder "out"}/lib/${pname}"

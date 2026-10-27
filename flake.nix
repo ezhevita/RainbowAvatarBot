@@ -31,7 +31,7 @@
         let pkgs = import nixpkgs { inherit system; };
         in {
           default = pkgs.mkShell {
-            packages = [ pkgs.dotnetCorePackages.sdk_10_0 pkgs.ffmpeg pkgs.postgresql_18 ];
+            packages = [ pkgs.dotnetCorePackages.sdk_10_0 pkgs.ffmpeg-headless pkgs.postgresql_18 ];
             DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = "false";
           };
         });

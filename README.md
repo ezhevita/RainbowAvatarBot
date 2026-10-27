@@ -2,75 +2,9 @@
 
 Telegram bot for adding pride flags to avatars, stickers and images.
 
-## PostgreSQL
-
-User settings are stored in PostgreSQL through EF Core and its Npgsql provider.
-Create a dedicated database and role for the bot,
-then configure the connection string through the environment (for Nix, Docker,
-and `dotnet run`):
-
-```sh
-export ConnectionStrings__PostgreSQL='Host=localhost;Database=rainbow_avatar_bot;Username=rainbow_avatar_bot;Password=your-password'
-```
-
-The bot initializes an empty database with EF Core's `EnsureCreatedAsync` before
-connecting to Telegram. Existing settings tables, including JSON imports, remain
-compatible. Schema changes are not automatically migrated. The role
-needs permission to create tables in its schema and read/write the table. Missing
-configuration or an unavailable database stops startup. New users retain the
-defaults: LGBT flag, 50% opacity, and HardLight blending. Every settings change is
-committed before the bot confirms it; concurrent changes to different settings
-do not overwrite each other.
-
-User IDs use PostgreSQL `bigint`, constrained to `1` through `4503599627370495`
-(`2^52 - 1`), following the [Bot API's 52-bit limit](https://core.telegram.org/bots/api#user).
-New databases and JSON imports into new tables enforce this constraint
-automatically.
-
-### Import existing settings
-
-Stop the old bot and back up `data/config.json`. Before starting the new bot, use
-`psql` to import that JSON into the new database. Run from the repository root,
-adjusting the database connection and JSON file path to your installation:
-
-```sh
-psql 'host=localhost dbname=rainbow_avatar_bot user=rainbow_avatar_bot' \
-  --set=ON_ERROR_STOP=1 \
-  --set=settings_json="$(cat data/config.json)" \
-  --file=RainbowAvatarBot/Database/import-json.sql
-```
-
-The import creates the table if needed and runs in a transaction. Existing
-database rows are preserved, so rerunning it does not overwrite newer settings.
-The bot no longer reads or writes `data/config.json`; keep the backup until you
-have verified the imported settings.
-
 ## Nix
 
-The flake provides a package, runnable app, and development shell for x86-64 and
-ARM64 Linux and Apple Silicon macOS. It uses .NET 10 and FFmpeg from the pinned
-nixpkgs input;
-FFmpeg includes the libvpx VP9 codec and filters used by the Docker build.
-
-Build and run with Nix (with `nix-command` and `flakes` enabled):
-
-```sh
-nix build path:.
-Bot__Token='your-telegram-bot-token' Bot__OwnerId='your-telegram-user-id' nix run path:.
-```
-
-Set `ConnectionStrings__PostgreSQL` as described above before running the bot.
-Run from a writable directory: generated flag images are saved in `images/`,
-relative to the working directory. The package
-loads its bundled `appsettings.json` and sticker asset from the Nix store.
-Override configuration with .NET environment variables such as `Bot__Token`,
-`Bot__OwnerId`, and `Logging__LogLevel__Default`, or command-line arguments:
-
-```sh
-nix run path:. -- --Bot:EnableBlendModeSettings=false
-```
-
-For development:
+Development shell:
 
 ```sh
 nix develop path:.
@@ -78,11 +12,7 @@ cd RainbowAvatarBot
 dotnet run
 ```
 
-The development shell also includes PostgreSQL 18 (`psql`, `initdb`, and
-`pg_ctl`). PostgreSQL runs separately; the bot package does not start a database
-server.
-
-After changing NuGet package references, regenerate the dependency hashes:
+Regenerate the dependency hashes:
 
 ```sh
 nix build path:.#default.fetch-deps --out-link /tmp/rainbow-avatar-bot-fetch-deps
@@ -90,7 +20,8 @@ nix build path:.#default.fetch-deps --out-link /tmp/rainbow-avatar-bot-fetch-dep
 nix build path:.
 ```
 
-Update nixpkgs with `nix flake update --flake path:.` and regenerate the NuGet
-dependency hashes afterward if the SDK changes. The explicit `path:.` references
-also work before the new flake files have been added to Git; once tracked, the
-usual `nix build`, `nix run`, and `nix develop` commands work as well.
+Update nixpkgs:
+
+```sh
+nix flake update --flake path:.
+```
