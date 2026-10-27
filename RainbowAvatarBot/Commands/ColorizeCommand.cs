@@ -22,13 +22,13 @@ internal sealed partial class ColorizeCommand : ICommand
 	private readonly ProcessorHandler _processorHandler;
 	private readonly IMemoryCache _memoryCache;
 	private readonly RecyclableMemoryStreamManager _streamManager;
-	private readonly IOptions<BotConfiguration> _botOptions;
+	private readonly IOptions<BotOptions> _botOptions;
 	private readonly BotUserData _botUserData;
 	private readonly ILogger<ColorizeCommand> _logger;
 
 	public ColorizeCommand(UserSettingsService userSettingsService, RateLimitingService rateLimitingService,
 		ProcessorHandler processorHandler, IMemoryCache memoryCache, RecyclableMemoryStreamManager streamManager,
-		IOptions<BotConfiguration> botOptions, BotUserData botUserData, ILogger<ColorizeCommand> logger)
+		IOptions<BotOptions> botOptions, BotUserData botUserData, ILogger<ColorizeCommand> logger)
 	{
 		_userSettingsService = userSettingsService;
 		_rateLimitingService = rateLimitingService;

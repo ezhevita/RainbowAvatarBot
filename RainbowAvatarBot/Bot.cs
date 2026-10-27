@@ -25,10 +25,10 @@ internal sealed partial class Bot
 	private readonly UserSettingsService _userSettingsService;
 	private readonly ILogger<Bot> _logger;
 	private readonly BotUserData _botUserData;
-	private readonly BotConfiguration _botConfiguration;
+	private readonly BotOptions _botOptions;
 
 	public Bot(ITelegramBotClient telegramBotClient, CommandHandler commandHandler, FlagImageService flagImageService,
-		UserSettingsService userSettingsService, IOptions<BotConfiguration> botConfiguration, ILogger<Bot> logger,
+		UserSettingsService userSettingsService, IOptions<BotOptions> botConfiguration, ILogger<Bot> logger,
 		BotUserData botUserData)
 	{
 		_telegramBotClient = telegramBotClient;
@@ -37,7 +37,7 @@ internal sealed partial class Bot
 		_userSettingsService = userSettingsService;
 		_logger = logger;
 		_botUserData = botUserData;
-		_botConfiguration = botConfiguration.Value;
+		_botOptions = botConfiguration.Value;
 	}
 
 	public async Task Init()
@@ -51,7 +51,7 @@ internal sealed partial class Bot
 
 		_botUserData.Username = me.Username!;
 
-		var stickerPackName = _botConfiguration.PackNamePrefix + _botUserData.Username;
+		var stickerPackName = _botOptions.PackNamePrefix + _botUserData.Username;
 		try
 		{
 			await _telegramBotClient.GetStickerSet(stickerPackName);
@@ -67,8 +67,8 @@ internal sealed partial class Bot
 
 				memoryStream.Write(Convert.FromBase64String(EmptyImage));
 				await _telegramBotClient.CreateNewStickerSet(
-					_botConfiguration.OwnerId,
-					_botConfiguration.PackNamePrefix + _botUserData.Username,
+					_botOptions.OwnerId,
+					_botOptions.PackNamePrefix + _botUserData.Username,
 					"Created by @" + _botUserData.Username,
 					[
 						new InputSticker(

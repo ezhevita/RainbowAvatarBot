@@ -22,7 +22,7 @@ internal class AnimatedStickerProcessor : IProcessor
 	private readonly FrozenDictionary<string, float[]> _flagGradients;
 	private readonly FrozenDictionary<string, int> _colorsCount;
 
-	public AnimatedStickerProcessor(IOptions<ProcessingConfiguration> options, RecyclableMemoryStreamManager memoryStreamManager)
+	public AnimatedStickerProcessor(IOptions<ProcessingOptions> options, RecyclableMemoryStreamManager memoryStreamManager)
 	{
 		var gradientOverlay = JsonNode.Parse(options.Value.GradientOverlay);
 		if (gradientOverlay is null)

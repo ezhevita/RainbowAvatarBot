@@ -5,6 +5,11 @@
     "hash": "sha256-Lnx2qn7TyEs1Gmj7qhzInS1+ZDfgoN7HLWy8T4QyHmo="
   },
   {
+    "pname": "FluentValidation",
+    "version": "12.2.0",
+    "hash": "sha256-hytCohgfVl4tG+rf3yC2zLBrW0c5gK0SAPROTb7uxqU="
+  },
+  {
     "pname": "Humanizer.Core",
     "version": "2.14.1",
     "hash": "sha256-EXvojddPu+9JKgOG9NSQgUTfWq1RpOYw7adxDPKDJ6o="

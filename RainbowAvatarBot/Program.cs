@@ -19,13 +19,13 @@ using Telegram.Bot.Polling;
 using var host = Host.CreateDefaultBuilder(args)
 	.ConfigureServices((context, services) =>
 		{
-			services.Configure<BotConfiguration>(context.Configuration.GetSection("Bot"));
-			services.Configure<ProcessingConfiguration>(context.Configuration.GetSection("Processing"));
+			services.AddValidatableOptions<BotOptions, BotOptionsValidator>();
+			services.AddValidatableOptions<ProcessingOptions, ProcessingOptionsValidator>();
 
 			services.AddHttpClient("telegram_bot_client")
 				.AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
 					{
-						var botConfig = sp.GetRequiredService<IOptions<BotConfiguration>>().Value;
+						var botConfig = sp.GetRequiredService<IOptions<BotOptions>>().Value;
 						var options = new TelegramBotClientOptions(botConfig.Token);
 
 						return new TelegramBotClient(options, httpClient);

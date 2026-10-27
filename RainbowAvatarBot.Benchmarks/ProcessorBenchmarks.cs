@@ -45,7 +45,7 @@ public class ProcessorBenchmarks
 			configuration = (await JsonSerializer.DeserializeAsync<Configuration>(file))!;
 		}
 
-		var options = new OptionsWrapper<ProcessingConfiguration>(configuration.Processing);
+		var options = new OptionsWrapper<ProcessingOptions>(configuration.Processing);
 		var images = new Dictionary<string, Image>();
 		var initService = new InitializationHostedService(null!, null!, images, options, null!);
 		await initService.InitializeImages(CancellationToken.None);

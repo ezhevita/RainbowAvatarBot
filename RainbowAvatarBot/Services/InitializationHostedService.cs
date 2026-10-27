@@ -28,15 +28,15 @@ internal sealed class InitializationHostedService : IHostedService
 		CompressionLevel = PngCompressionLevel.NoCompression
 	};
 
-	private readonly IOptions<ProcessingConfiguration> _processingOptions;
-	private readonly IOptions<BotConfiguration> _botOptions;
+	private readonly IOptions<ProcessingOptions> _processingOptions;
+	private readonly IOptions<BotOptions> _botOptions;
 	private readonly ITelegramBotClient _botClient;
 	private readonly BotUserData _botUserData;
 	private readonly Dictionary<string, Image> _flagImages;
 
 	public InitializationHostedService(ITelegramBotClient botClient, BotUserData botUserData,
-		Dictionary<string, Image> flagImages, IOptions<ProcessingConfiguration> processingOptions,
-		IOptions<BotConfiguration> botOptions)
+		Dictionary<string, Image> flagImages, IOptions<ProcessingOptions> processingOptions,
+		IOptions<BotOptions> botOptions)
 	{
 		_botClient = botClient;
 		_botUserData = botUserData;
